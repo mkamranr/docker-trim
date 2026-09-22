@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`--fail-on <severity>`**, so a pipeline can reject a Dockerfile that bakes in a
+  credential or ships a shell, without piping the JSON report through `jq`. Only unfixed
+  findings count, and the output names the rules responsible.
+
+### Changed
+
+- **Exit code `1` now means "findings met the `--fail-on` threshold".** Previously there
+  were only two codes; `2` still means dtrim itself could not run. Keeping them apart is
+  what lets a pipeline tell a bad Dockerfile from a broken tool. Nothing changes for a run
+  without `--fail-on`.
+
 ### Planned for 0.2
 
 - **Runtime tracing** (`--trace`, `--tracer`). A static sensor injected into the container
@@ -18,8 +31,6 @@ All notable changes to this project are documented here. The format follows
   builds, and use `trivy` or `grype` automatically when either is on `PATH`.
 - **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
   reporting that Debian and Alpine images already get.
-- **`--fail-on <severity>`** for CI, so a pipeline can reject a Dockerfile that ships a shell
-  or bakes in a credential.
 - Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
 
 ## [0.1.0] - 2026-09-22

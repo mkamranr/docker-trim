@@ -62,6 +62,10 @@ type Config struct {
 	// Context is the build context directory. Defaults to the Dockerfile's
 	// directory.
 	Context string
+	// FailOn makes dtrim exit non-zero when a finding of this severity or
+	// worse survives. Empty means never fail on findings, which is the
+	// default: a report is not an error unless you asked for it to be.
+	FailOn Severity
 	// NoColor disables ANSI colour regardless of TTY detection.
 	NoColor bool
 	// Verbose streams the underlying build output rather than a status line.
@@ -93,6 +97,9 @@ func (c *Config) Validate() error {
 	}
 	if _, err := ParseTracer(string(c.Tracer)); err != nil {
 		return err
+	}
+	if c.FailOn != "" && c.FailOn.Rank() < 0 {
+		return fmt.Errorf("unknown --fail-on severity %q: want info, low, medium, high or critical", c.FailOn)
 	}
 	switch c.Aggressiveness {
 	case ConfidenceSafe, ConfidenceLikely, ConfidenceAggressive:

@@ -86,6 +86,25 @@ worth fixing, and the diff in a collapsed block.
 Show every finding rather than the top eight, and stream the underlying `docker build`
 output during `--verify` instead of a status line.
 
+### `--fail-on`
+
+Exit `1` when a finding of the given severity or worse survives: `info`, `low`, `medium`,
+`high` or `critical`. Without it, dtrim reports and exits `0`, because a report is not a
+failure unless you asked for one.
+
+Only unfixed findings count. Something `--optimize` repaired is no longer in the file you
+are about to build, so it does not fail the gate.
+
+```console
+$ dtrim --analyze-only --fail-on high
+...
+FAIL 6 findings at high or above: DT011, DT010
+$ echo $?
+1
+```
+
+The output names the rules responsible, so a red pipeline explains itself without a re-run.
+
 ### `--no-diff`, `--no-color`
 
 Skip the diff; disable colour. Colour is also disabled when `NO_COLOR` is set or stdout is
@@ -101,8 +120,13 @@ keep working when runtime tracing and CVE lookup land in 0.2. See [tracing.md](t
 **Check a Dockerfile in CI and fail on a baked credential.**
 
 ```sh
-dtrim --analyze-only -f Dockerfile --quiet \
-  | jq -e '[.findings[] | select(.severity == "critical")] | length == 0'
+dtrim --analyze-only -f Dockerfile --fail-on critical
+```
+
+**Be stricter: refuse anything that ships a shell or runs as root.**
+
+```sh
+dtrim --analyze-only -f Dockerfile --fail-on high
 ```
 
 **Post a report on a pull request.**
@@ -138,8 +162,10 @@ dtrim -f Dockerfile --optimize --verify && mv Dockerfile.trimmed Dockerfile
 
 | Code | Meaning |
 | ---: | :--- |
-| `0` | Success, including a run that found problems it did not fix |
-| `2` | Anything went wrong: unreadable file, bad flag, failed build |
+| `0` | Clean run. Without `--fail-on`, this includes a run that reported problems |
+| `1` | `--fail-on` was given and a finding at or above that severity survived |
+| `2` | dtrim could not do its job: unreadable file, bad flag, failed build |
 
-There is no third code, so a script can test for failure without a lookup table. If you want
-findings to fail a build, filter the JSON report, as in the CI recipe above.
+`1` and `2` are kept apart on purpose. A pipeline needs to tell "your Dockerfile ships a
+shell" from "dtrim crashed", and collapsing both into one code means a broken tool looks
+like a broken Dockerfile.

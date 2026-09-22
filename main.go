@@ -19,15 +19,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mkamranr/dtrim/internal/version"
+	"github.com/mkamranr/dtrim/pkg/analyzer"
 	"github.com/mkamranr/dtrim/pkg/dtrim"
 	"github.com/mkamranr/dtrim/pkg/reporter"
 )
 
-// Exit codes. 0 on success, 2 for anything that went wrong; there is no third
-// meaning, so a script can test for failure without a lookup table.
+// Exit codes follow the convention every linter uses: 0 is a clean run, 1 means
+// the tool worked and did not like what it found, 2 means the tool itself could
+// not do its job. Keeping those apart is what lets a pipeline tell "your
+// Dockerfile ships a shell" from "dtrim crashed".
 const (
-	exitOK    = 0
-	exitError = 2
+	exitOK       = 0
+	exitFindings = 1
+	exitError    = 2
 )
 
 func main() {
@@ -38,13 +42,22 @@ func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := newRootCommand().ExecuteContext(ctx); err != nil {
+	// The gate result travels out of band rather than as an error: a Dockerfile
+	// that breaches the threshold is a successful run with an opinion, not a
+	// failure, and cobra would print it as one.
+	var gateFailed bool
+	cmd := newRootCommand(&gateFailed)
+
+	if err := cmd.ExecuteContext(ctx); err != nil {
 		if errors.Is(err, context.Canceled) {
 			fmt.Fprintln(os.Stderr, "dtrim: interrupted")
 			return exitError
 		}
 		fmt.Fprintf(os.Stderr, "dtrim: %v\n", err)
 		return exitError
+	}
+	if gateFailed {
+		return exitFindings
 	}
 	return exitOK
 }
@@ -63,13 +76,14 @@ type flags struct {
 	tracer         string
 	osv            bool
 	buildContext   string
+	failOn         string
 	noColor        bool
 	verbose        bool
 	markdown       bool
 	noDiff         bool
 }
 
-func newRootCommand() *cobra.Command {
+func newRootCommand(gateFailed *bool) *cobra.Command {
 	var f flags
 
 	cmd := &cobra.Command{
@@ -89,6 +103,7 @@ func newRootCommand() *cobra.Command {
 			"  dtrim --file ./Dockerfile --optimize --base distroless --verify",
 			"  dtrim --analyze-only myapp:latest",
 			"  dtrim --analyze-only myapp:latest --quiet | jq .image.categories",
+			"  dtrim --analyze-only --fail-on high   # exits 1 if the image ships a shell",
 		}, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := configure(cmd, &f, args)
@@ -99,7 +114,11 @@ func newRootCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return render(cfg, &f, rep)
+			if err := render(cfg, &f, rep); err != nil {
+				return err
+			}
+			*gateFailed = len(rep.Breaches(cfg.FailOn)) > 0
+			return nil
 		},
 	}
 
@@ -121,6 +140,7 @@ func newRootCommand() *cobra.Command {
 	fl.StringVar(&f.tracer, "tracer", "none", "Runtime tracing backend: none, proc, ptrace, ebpf (planned for 0.2)")
 	fl.BoolVar(&f.osv, "osv", false, "Look up real CVEs from api.osv.dev (planned for 0.2)")
 	fl.StringVar(&f.buildContext, "context", "", "Build context directory (default: the Dockerfile's directory)")
+	fl.StringVar(&f.failOn, "fail-on", "", "Exit 1 when a finding of this severity or worse survives: info, low, medium, high, critical")
 	fl.BoolVar(&f.noColor, "no-color", false, "Disable coloured output")
 	fl.BoolVar(&f.verbose, "verbose", false, "Show every finding rather than the most important ones")
 	fl.BoolVar(&f.markdown, "markdown", false, "Emit a Markdown report suitable for a pull request comment")
@@ -183,6 +203,13 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 	cfg.NoColor = f.noColor
 	cfg.Verbose = f.verbose
 
+	if f.failOn != "" {
+		sev, err := analyzer.ParseSeverity(f.failOn)
+		if err != nil {
+			return cfg, fmt.Errorf("--fail-on: %w", err)
+		}
+		cfg.FailOn = sev
+	}
 	if f.osv {
 		return cfg, errors.New("--osv is not implemented in this release; real CVE lookup is planned for 0.2 (see CHANGELOG)")
 	}
@@ -196,7 +223,7 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 
 // render writes the report in whichever form was asked for.
 func render(cfg dtrim.Config, f *flags, rep *dtrim.Report) error {
-	opt := reporter.Options{NoColor: cfg.NoColor, Verbose: f.verbose}
+	opt := reporter.Options{NoColor: cfg.NoColor, Verbose: f.verbose, FailOn: cfg.FailOn}
 
 	// --quiet means the JSON report and nothing else, so it can be piped.
 	if cfg.Quiet {

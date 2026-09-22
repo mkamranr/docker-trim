@@ -255,3 +255,74 @@ func TestVersion_prints_something(t *testing.T) {
 		t.Errorf("--version: code=%d output=%q", r.code, r.stdout)
 	}
 }
+
+// --fail-on is what makes dtrim usable as a CI gate, so the three exit codes
+// have to stay distinct: a pipeline needs to tell "your Dockerfile ships a
+// shell" from "dtrim could not run".
+func TestFailOn_exit_codes(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want int
+	}{
+		{"no threshold never fails", []string{"--analyze-only", "-f", fixture("node-express.Dockerfile")}, 0},
+		{"threshold above what was found", []string{"--analyze-only", "-f", fixture("node-express.Dockerfile"), "--fail-on", "critical"}, 0},
+		{"threshold met", []string{"--analyze-only", "-f", fixture("node-express.Dockerfile"), "--fail-on", "high"}, 1},
+		{"threshold below what was found", []string{"--analyze-only", "-f", fixture("node-express.Dockerfile"), "--fail-on", "info"}, 1},
+		{"clean file passes", []string{"--analyze-only", "-f", fixture("already-multistage.Dockerfile"), "--fail-on", "critical"}, 0},
+		{"still a gate under --quiet", []string{"--analyze-only", "-f", fixture("node-express.Dockerfile"), "--fail-on", "high", "--quiet"}, 1},
+		{"a bad severity is a tool error", []string{"--analyze-only", "-f", fixture("go-api.Dockerfile"), "--fail-on", "nonsense"}, 2},
+		{"a missing file is a tool error", []string{"--analyze-only", "-f", "no/such/file", "--fail-on", "info"}, 2},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := dtrim(t, c.args...); got.code != c.want {
+				t.Errorf("exit code = %d, want %d\n%s%s", got.code, c.want, got.stdout, got.stderr)
+			}
+		})
+	}
+}
+
+func TestFailOn_names_the_rules_responsible(t *testing.T) {
+	r := dtrim(t, "--analyze-only", "-f", fixture("node-express.Dockerfile"), "--fail-on", "high", "--no-diff")
+
+	if r.code != 1 {
+		t.Fatalf("exit code = %d, want 1", r.code)
+	}
+	if !strings.Contains(r.stdout, "FAIL") {
+		t.Errorf("no FAIL line:\n%s", r.stdout)
+	}
+	// Someone reading a red pipeline should not have to re-run anything to
+	// find out which rule tripped it.
+	for _, rule := range []string{"DT010", "DT011"} {
+		if !strings.Contains(r.stdout, rule) {
+			t.Errorf("the FAIL line does not name %s:\n%s", rule, r.stdout)
+		}
+	}
+}
+
+func TestFailOn_says_so_when_it_passes(t *testing.T) {
+	r := dtrim(t, "--analyze-only", "-f", fixture("already-multistage.Dockerfile"), "--fail-on", "critical", "--no-diff")
+	if r.code != 0 {
+		t.Fatalf("exit code = %d, want 0", r.code)
+	}
+	if !strings.Contains(r.stdout, "PASS") {
+		t.Errorf("a passing gate should say so:\n%s", r.stdout)
+	}
+}
+
+// Fixing a finding removes it from the file you are about to build, so it must
+// not keep failing the pipeline.
+func TestFailOn_ignores_findings_that_were_fixed(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "Dockerfile.trimmed")
+	analyzed := dtrim(t, "--analyze-only", "-f", fixture("go-api.Dockerfile"), "--fail-on", "medium")
+	optimized := dtrim(t, "--optimize", "-f", fixture("go-api.Dockerfile"), "-o", out, "--fail-on", "medium", "--no-diff")
+
+	if analyzed.code != 1 {
+		t.Fatalf("the unfixed file should trip a medium gate, got exit %d", analyzed.code)
+	}
+	if optimized.code != 0 {
+		t.Errorf("after rewriting, the medium findings are gone, so the gate should pass; got exit %d\n%s",
+			optimized.code, optimized.stdout)
+	}
+}

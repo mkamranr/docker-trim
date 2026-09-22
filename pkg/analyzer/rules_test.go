@@ -248,3 +248,35 @@ func TestIsDependencyInstall_separates_fetching_deps_from_building(t *testing.T)
 		}
 	}
 }
+
+func TestSeverity_ranks_worst_highest(t *testing.T) {
+	order := []Severity{SeverityInfo, SeverityLow, SeverityMedium, SeverityHigh, SeverityCritical}
+	for i := 1; i < len(order); i++ {
+		if order[i].Rank() <= order[i-1].Rank() {
+			t.Errorf("%s does not rank above %s", order[i], order[i-1])
+		}
+	}
+	if Severity("nonsense").Rank() >= 0 {
+		t.Error("an unknown severity must not rank alongside real ones")
+	}
+}
+
+func TestParseSeverity(t *testing.T) {
+	for _, ok := range []string{"info", "low", "medium", "high", "critical"} {
+		if _, err := ParseSeverity(ok); err != nil {
+			t.Errorf("ParseSeverity(%q) = %v", ok, err)
+		}
+	}
+	if _, err := ParseSeverity("severe"); err == nil {
+		t.Error("ParseSeverity accepted a severity that does not exist")
+	}
+}
+
+func TestLint_sorts_the_worst_findings_first(t *testing.T) {
+	f := Lint(parseFixture(t, "node-express.Dockerfile"))
+	for i := 1; i < len(f); i++ {
+		if f[i].Severity.Rank() > f[i-1].Severity.Rank() {
+			t.Fatalf("finding %d (%s) outranks the one before it (%s)", i, f[i].Severity, f[i-1].Severity)
+		}
+	}
+}

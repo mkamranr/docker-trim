@@ -24,6 +24,8 @@ type Options struct {
 	NoColor bool
 	// Verbose prints every finding rather than the top ones.
 	Verbose bool
+	// FailOn, when set, adds the pass or fail line that explains the exit code.
+	FailOn dtrim.Severity
 }
 
 // palette wraps text in ANSI escapes, or leaves it alone.
@@ -85,9 +87,42 @@ func Text(w io.Writer, rep *dtrim.Report, opt Options) error {
 	writeFindings(b, p, rep, opt)
 	writeSummary(b, p, rep)
 	writeWarnings(b, p, rep)
+	writeGate(b, p, rep, opt)
 
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// writeGate explains a --fail-on failure, naming the rules responsible so the
+// person reading a red pipeline knows what to fix without re-running anything.
+func writeGate(b *strings.Builder, p palette, rep *dtrim.Report, opt Options) {
+	if opt.FailOn == "" {
+		return
+	}
+	breaches := rep.Breaches(opt.FailOn)
+	if len(breaches) == 0 {
+		fmt.Fprintf(b, "\n%s nothing at %s or above.\n",
+			p.good("PASS"), string(opt.FailOn))
+		return
+	}
+	seen := map[string]bool{}
+	var rules []string
+	for _, f := range breaches {
+		if !seen[f.RuleID] {
+			seen[f.RuleID] = true
+			rules = append(rules, f.RuleID)
+		}
+	}
+	fmt.Fprintf(b, "\n%s %d %s at %s or above: %s\n",
+		p.bad("FAIL"), len(breaches), plural("finding", len(breaches)),
+		string(opt.FailOn), strings.Join(rules, ", "))
+}
+
+func plural(word string, n int) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
 }
 
 // writeProgress emits the `[dtrim] ...` lines that narrate the run.

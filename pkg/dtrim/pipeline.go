@@ -34,6 +34,25 @@ type Report struct {
 	Notes        []string      `json:"notes,omitempty"`
 }
 
+// Breaches returns the findings at or above the given severity that a run
+// still has to answer for.
+//
+// Only unfixed findings count. Something dtrim repaired is no longer in the
+// Dockerfile you are about to build, so failing a pipeline over it would be
+// reporting on a file that no longer exists.
+func (r *Report) Breaches(threshold Severity) []Finding {
+	if threshold == "" {
+		return nil
+	}
+	var out []Finding
+	for _, f := range r.Findings {
+		if f.Severity.Rank() >= threshold.Rank() {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // DockerfileReport describes the file that was analyzed and what dtrim did
 // with it.
 type DockerfileReport struct {

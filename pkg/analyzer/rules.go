@@ -84,13 +84,10 @@ func FixAll(a *Analysis, ceiling Confidence) (fixed []Finding, remaining []Findi
 }
 
 func sortFindings(f []Finding) {
-	rank := map[Severity]int{
-		SeverityCritical: 0, SeverityHigh: 1, SeverityMedium: 2,
-		SeverityLow: 3, SeverityInfo: 4,
-	}
 	sort.SliceStable(f, func(i, j int) bool {
-		if rank[f[i].Severity] != rank[f[j].Severity] {
-			return rank[f[i].Severity] < rank[f[j].Severity]
+		// Worst first, then by position in the file.
+		if a, b := f[i].Severity.Rank(), f[j].Severity.Rank(); a != b {
+			return a > b
 		}
 		return f[i].Line < f[j].Line
 	})

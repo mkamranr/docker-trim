@@ -151,6 +151,7 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--base` | `-b` | `distroless` | Target runtime base: `distroless`, `alpine`, `scratch` |
 | `--verify` | | `false` | Build both images, measure them, and start the trimmed one |
 | `--analyze-only` | | `false` | Report only; never writes anything |
+| `--fail-on` | | | Exit 1 when a finding of this severity or worse survives |
 | `--aggressiveness` | | `likely` | How much to change: `safe`, `likely`, `aggressive` |
 | `--quiet` | `-q` | `false` | Emit the JSON report on stdout and nothing else |
 | `--markdown` | | `false` | Emit a report for a pull request comment |
@@ -161,7 +162,15 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--tracer` | | `none` | Tracing backend — planned for 0.2 |
 | `--osv` | | `false` | Real CVE lookup — planned for 0.2 |
 
-Exit code is `0` on success and `2` on any error. Full details in [`docs/usage.md`](docs/usage.md).
+Exit codes: `0` clean, `1` when `--fail-on` was given and something met the threshold, `2`
+when dtrim itself could not run. Full details in [`docs/usage.md`](docs/usage.md).
+
+As a CI gate:
+
+```sh
+dtrim --analyze-only --fail-on critical    # refuse a baked credential
+dtrim --analyze-only --fail-on high        # also refuse a shell, or running as root
+```
 
 ## How it works
 

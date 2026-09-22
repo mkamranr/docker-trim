@@ -5,7 +5,10 @@ package analyzer
 // package dtrim re-exports them under the names the PRD uses, which is the
 // interface the library presents.
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // DockerfileAST is the parsed representation of a single build stage.
 //
@@ -92,6 +95,32 @@ const (
 	SeverityHigh     Severity = "high"
 	SeverityCritical Severity = "critical"
 )
+
+// Rank orders severities so a threshold is a comparison. Higher is worse.
+func (s Severity) Rank() int {
+	switch s {
+	case SeverityInfo:
+		return 0
+	case SeverityLow:
+		return 1
+	case SeverityMedium:
+		return 2
+	case SeverityHigh:
+		return 3
+	case SeverityCritical:
+		return 4
+	}
+	return -1
+}
+
+// ParseSeverity validates a severity name.
+func ParseSeverity(v string) (Severity, error) {
+	sev := Severity(v)
+	if sev.Rank() < 0 {
+		return "", fmt.Errorf("unknown severity %q: want info, low, medium, high or critical", v)
+	}
+	return sev, nil
+}
 
 // Confidence says how sure dtrim is that applying a rule's fix is safe.
 //
