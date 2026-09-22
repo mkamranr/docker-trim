@@ -65,13 +65,13 @@ func Lint(a *Analysis) []Finding {
 	return out
 }
 
-// FixAll applies every fixer whose confidence is at or below max, then re-lints
+// FixAll applies every fixer whose confidence is at or below ceiling, then re-lints
 // so the returned findings reflect the repaired file. Findings the fixers
 // resolved come back with Fixed set, which is what the diff report renders.
-func FixAll(a *Analysis, max Confidence) (fixed []Finding, remaining []Finding) {
+func FixAll(a *Analysis, ceiling Confidence) (fixed []Finding, remaining []Finding) {
 	for _, r := range registry() {
 		f, ok := r.(Fixer)
-		if !ok || r.Confidence().Rank() > max.Rank() {
+		if !ok || r.Confidence().Rank() > ceiling.Rank() {
 			continue
 		}
 		for _, found := range f.Fix(a) {
@@ -529,12 +529,6 @@ func (ruleCopyBeforeManifest) Title() string {
 func (ruleCopyBeforeManifest) Severity() Severity { return SeverityLow }
 func (ruleCopyBeforeManifest) Confidence() Confidence {
 	return ConfidenceLikely
-}
-
-var manifestFiles = []string{
-	"package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock",
-	"requirements.txt", "pyproject.toml", "poetry.lock", "Pipfile.lock",
-	"go.mod", "go.sum", "Cargo.toml", "Cargo.lock", "pom.xml", "build.gradle", "Gemfile.lock",
 }
 
 func (r ruleCopyBeforeManifest) Check(a *Analysis) []Finding {

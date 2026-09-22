@@ -68,14 +68,14 @@ func verify(ctx context.Context, cfg Config, rep *Report) error {
 		}
 	}
 
-	fmt.Fprintf(status, "[dtrim] Building the original image to measure it...\n")
+	_, _ = fmt.Fprintf(status, "[dtrim] Building the original image to measure it...\n")
 	originalSize, err := tracer.Build(ctx, tracer.BuildRequest{
 		Dockerfile: cfg.File, Context: buildContext, Tag: origTag, Progress: progress})
 	if err != nil {
 		return fmt.Errorf("the original Dockerfile does not build, so there is nothing to compare against: %w", err)
 	}
 
-	fmt.Fprintf(status, "[dtrim] Building the trimmed image...\n")
+	_, _ = fmt.Fprintf(status, "[dtrim] Building the trimmed image...\n")
 	trimmedSize, err := tracer.Build(ctx, tracer.BuildRequest{
 		Dockerfile: df.Output, Context: buildContext, Tag: trimTag, Progress: progress})
 	if err != nil {
@@ -83,7 +83,7 @@ func verify(ctx context.Context, cfg Config, rep *Report) error {
 			"open a bad-rewrite issue with %s attached.\n%w", df.Output, err)
 	}
 
-	fmt.Fprintf(status, "[dtrim] Starting the trimmed image to check it still runs...\n")
+	_, _ = fmt.Fprintf(status, "[dtrim] Starting the trimmed image to check it still runs...\n")
 	smoke := tracer.Smoke(ctx, trimTag, smokeWindow)
 
 	rep.Result.OriginalSizeBytes = originalSize

@@ -20,7 +20,7 @@ golden:
 lint:
 	@test -z "$$(gofmt -l . | tee /dev/stderr)" || (echo "gofmt: files need formatting" >&2; exit 1)
 	go vet ./...
-	@command -v golangci-lint >/dev/null && golangci-lint run || echo "golangci-lint not installed, skipped"
+	@command -v golangci-lint >/dev/null && golangci-lint run --build-tags integration || echo "golangci-lint not installed, skipped"
 
 fmt:
 	gofmt -w .

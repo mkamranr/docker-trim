@@ -46,6 +46,9 @@ jobs:
       - uses: golangci/golangci-lint-action@v8
         with:
           version: latest
+          # The integration tests are behind a build tag, so without this they
+          # are never linted and only break once CI runs them.
+          args: --build-tags integration
 
   tidy:
     runs-on: ubuntu-latest

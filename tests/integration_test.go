@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -19,9 +20,14 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	binary = filepath.Join(dir, "dtrim")
+	if runtime.GOOS == "windows" {
+		// Without the extension, exec.Command cannot find the binary that was
+		// just built a line below.
+		binary += ".exe"
+	}
 	build := exec.Command("go", "build", "-o", binary, "..")
 	build.Stderr = os.Stderr
 	if err := build.Run(); err != nil {

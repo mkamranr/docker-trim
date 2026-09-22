@@ -13,6 +13,8 @@ import (
 // backend rather than eBPF.
 type TracerBackend string
 
+// The runtime tracing backends. Only TracerNone does anything in this release;
+// see docs/tracing.md.
 const (
 	TracerNone   TracerBackend = "none"
 	TracerProc   TracerBackend = "proc"

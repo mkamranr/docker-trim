@@ -75,7 +75,7 @@ func ParseFile(path string) (*Analysis, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	a, err := Parse(f)
 	if err != nil {

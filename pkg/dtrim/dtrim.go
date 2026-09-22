@@ -15,21 +15,32 @@ import (
 	"github.com/mkamranr/dtrim/pkg/synthesizer"
 )
 
-// The PRD's section 5 data structures.
-type (
-	DockerfileAST      = analyzer.DockerfileAST
-	Instruction        = analyzer.Instruction
-	TraceManifest      = analyzer.TraceManifest
-	OptimizationResult = analyzer.OptimizationResult
-	Finding            = analyzer.Finding
-	Severity           = analyzer.Severity
-	Confidence         = analyzer.Confidence
+// DockerfileAST is one parsed build stage. See analyzer.DockerfileAST.
+type DockerfileAST = analyzer.DockerfileAST
 
-	// Base is the --base value: which minimal runtime the final stage lands
-	// on. It is defined by the synthesizer, which owns the mapping.
-	Base = synthesizer.Base
-)
+// Instruction is one Dockerfile directive. See analyzer.Instruction.
+type Instruction = analyzer.Instruction
 
+// TraceManifest is what a traced container actually touched. See analyzer.TraceManifest.
+type TraceManifest = analyzer.TraceManifest
+
+// OptimizationResult is the headline reduction report. See analyzer.OptimizationResult.
+type OptimizationResult = analyzer.OptimizationResult
+
+// Finding is one thing dtrim noticed. See analyzer.Finding.
+type Finding = analyzer.Finding
+
+// Severity ranks a finding. See analyzer.Severity.
+type Severity = analyzer.Severity
+
+// Confidence says how sure dtrim is that a fix is safe. See analyzer.Confidence.
+type Confidence = analyzer.Confidence
+
+// Base is the --base value: which minimal runtime the final stage lands on. It
+// is defined by the synthesizer, which owns the mapping.
+type Base = synthesizer.Base
+
+// Severity levels, re-exported from the analyzer.
 const (
 	SeverityInfo     = analyzer.SeverityInfo
 	SeverityLow      = analyzer.SeverityLow
@@ -40,7 +51,10 @@ const (
 	ConfidenceSafe       = analyzer.ConfidenceSafe
 	ConfidenceLikely     = analyzer.ConfidenceLikely
 	ConfidenceAggressive = analyzer.ConfidenceAggressive
+)
 
+// Runtime bases, re-exported from the synthesizer.
+const (
 	BaseDistroless = synthesizer.BaseDistroless
 	BaseAlpine     = synthesizer.BaseAlpine
 	BaseScratch    = synthesizer.BaseScratch

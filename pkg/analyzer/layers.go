@@ -234,7 +234,7 @@ func inspect(ctx context.Context, ref, source string, img v1.Image) (*ImageRepor
 				break
 			}
 			if err != nil {
-				rc.Close()
+				_ = rc.Close()
 				return nil, fmt.Errorf("cannot read layer %d of %s: %w", i, ref, err)
 			}
 			if hdr.Typeflag == tar.TypeDir {
@@ -272,7 +272,7 @@ func inspect(ctx context.Context, ref, source string, img v1.Image) (*ImageRepor
 			all = append(all, FileInfo{Path: p, Size: hdr.Size, Layer: i})
 			pkgFiles.maybeCapture(p, tr)
 		}
-		rc.Close()
+		_ = rc.Close()
 		rep.Layers = append(rep.Layers, info)
 	}
 

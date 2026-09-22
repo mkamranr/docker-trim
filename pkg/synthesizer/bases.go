@@ -12,10 +12,15 @@ import (
 // on. It is the value of the --base flag.
 type Base string
 
+// The runtime bases dtrim can target.
 const (
+	// BaseDistroless is a Google distroless image: no shell, no package
+	// manager, and the smallest option that still carries a libc.
 	BaseDistroless Base = "distroless"
-	BaseAlpine     Base = "alpine"
-	BaseScratch    Base = "scratch"
+	// BaseAlpine is Alpine Linux, which uses musl rather than glibc.
+	BaseAlpine Base = "alpine"
+	// BaseScratch is the empty image, which suits a static binary and nothing else.
+	BaseScratch Base = "scratch"
 )
 
 // ParseBase validates the --base value.
@@ -34,6 +39,8 @@ type Ecosystem string
 // Artifact is one path copied out of the builder stage.
 type Artifact struct{ From, To string }
 
+// The toolchains dtrim can recognise. EcosystemUnknown means it could not tell
+// what the build produces, and so declines to restructure it.
 const (
 	EcosystemGo      Ecosystem = "go"
 	EcosystemNode    Ecosystem = "node"
@@ -94,12 +101,6 @@ const (
 	alpineTag        = "alpine:3.21"
 	distrolessStatic = "gcr.io/distroless/static-debian12:nonroot"
 	distrolessCC     = "gcr.io/distroless/cc-debian12:nonroot"
-	distrolessBase   = "gcr.io/distroless/base-debian12:nonroot"
-	// distrolessPythonMinor is the CPython version inside
-	// gcr.io/distroless/python3-debian12. Site-packages paths are version
-	// specific, so a builder on any other minor produces an image that starts
-	// and then cannot import anything.
-	distrolessPythonMinor = "3.11"
 )
 
 // DetectEcosystem works out what the final stage builds with, from its base
@@ -526,40 +527,6 @@ func jarPath(stage *analyzer.DockerfileAST) string {
 		}
 	}
 	return ""
-}
-
-// pythonCommand adapts ENTRYPOINT and CMD to a base whose entrypoint is the
-// interpreter itself.
-//
-// `CMD ["python","app.py"]` becomes `["app.py"]`, since the base already runs
-// python. `CMD ["gunicorn", ...]` is a console script rather than the
-// interpreter, and pip --target put it in <target>/bin, so it is named by full
-// path and handed to the interpreter as a script.
-func pythonCommand(stage *analyzer.DockerfileAST, pipTarget string) (entrypoint, cmd []string) {
-	adapt := func(args []string) []string {
-		if len(args) == 0 {
-			return args
-		}
-		args = unquoteAll(args)
-		head := args[0]
-		if b := head[strings.LastIndex(head, "/")+1:]; b == "python" || b == "python3" ||
-			strings.HasPrefix(b, "python3.") {
-			return args[1:]
-		}
-		if !strings.Contains(head, "/") && pipTarget != "" {
-			args[0] = pipTarget + "/bin/" + head
-		}
-		return args
-	}
-	for _, ins := range stage.Instructions {
-		switch ins.Keyword {
-		case "ENTRYPOINT":
-			entrypoint = adapt(ins.Args)
-		case "CMD":
-			cmd = adapt(ins.Args)
-		}
-	}
-	return entrypoint, cmd
 }
 
 // stripInterpreter rewrites ENTRYPOINT and CMD for a runtime base that already

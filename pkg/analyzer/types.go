@@ -84,6 +84,7 @@ type OptimizationResult struct {
 // Severity ranks a finding.
 type Severity string
 
+// How much a finding matters, from a note to something worth blocking a release for.
 const (
 	SeverityInfo     Severity = "info"
 	SeverityLow      Severity = "low"
