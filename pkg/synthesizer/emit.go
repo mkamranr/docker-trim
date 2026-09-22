@@ -36,6 +36,12 @@ func Render(a *analyzer.Analysis) string {
 		b.WriteString(line)
 		b.WriteByte('\n')
 	}
+
+	// Everything above is assembled with LF; convert once at the end so a CRLF
+	// file comes back as CRLF rather than being silently reformatted.
+	if a.Newline == "\r\n" {
+		return strings.ReplaceAll(b.String(), "\n", "\r\n")
+	}
 	return b.String()
 }
 

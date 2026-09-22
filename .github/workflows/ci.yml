@@ -41,7 +41,9 @@ jobs:
             exit 1
           fi
       - run: go vet ./...
-      - uses: golangci/golangci-lint-action@v6
+      # v8 installs golangci-lint v2, which reads the v2 config in
+      # .golangci.yml and is built against a Go new enough for this go.mod.
+      - uses: golangci/golangci-lint-action@v8
         with:
           version: latest
 

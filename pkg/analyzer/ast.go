@@ -37,6 +37,10 @@ type Analysis struct {
 	Source []string
 	// Epilogue is everything after the last instruction.
 	Epilogue []string
+	// Newline is the line ending the source used, "\n" or "\r\n". A
+	// Dockerfile checked out on Windows is CRLF, and rewriting it as LF would
+	// change every line of the file and make the diff useless.
+	Newline string
 }
 
 // MultiStage reports whether the file already builds in more than one stage,
@@ -97,6 +101,7 @@ func Parse(r io.Reader) (*Analysis, error) {
 	a := &Analysis{
 		EscapeToken: res.EscapeToken,
 		Source:      splitLines(src),
+		Newline:     detectNewline(src),
 	}
 	for _, w := range res.Warnings {
 		a.Warnings = append(a.Warnings, w.Short)
@@ -297,6 +302,18 @@ func flagValue(flags []string, name string) string {
 		}
 	}
 	return ""
+}
+
+// detectNewline reports the line ending the source uses. Mixed endings resolve
+// to whichever is more common, so a file with one stray CRLF is not rewritten
+// wholesale.
+func detectNewline(src string) string {
+	crlf := strings.Count(src, "\r\n")
+	lf := strings.Count(src, "\n") - crlf
+	if crlf > lf {
+		return "\r\n"
+	}
+	return "\n"
 }
 
 func splitLines(s string) []string {

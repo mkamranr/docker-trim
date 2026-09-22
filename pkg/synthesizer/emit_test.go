@@ -112,3 +112,52 @@ func TestFormat_keeps_instruction_flags(t *testing.T) {
 		t.Errorf("format = %q", got)
 	}
 }
+
+// A Dockerfile checked out on Windows is CRLF. Rewriting it as LF would change
+// every line of the file and drown the real change in noise, so the line ending
+// has to survive.
+func TestRender_preserves_crlf_line_endings(t *testing.T) {
+	const lf = "FROM debian:12\nWORKDIR /app\nRUN apt-get update && apt-get install -y curl\nCMD [\"/app/x\"]\n"
+	crlf := strings.ReplaceAll(lf, "\n", "\r\n")
+
+	a, err := analyzer.Parse(strings.NewReader(crlf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Newline != "\r\n" {
+		t.Fatalf("Newline = %q, want CRLF", a.Newline)
+	}
+	if got := Render(a); got != crlf {
+		t.Errorf("untouched CRLF file did not round trip:\n%q\nwant\n%q", got, crlf)
+	}
+
+	// And it must still hold once a rule has rewritten an instruction.
+	a2, err := analyzer.Parse(strings.NewReader(crlf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	analyzer.FixAll(a2, analyzer.ConfidenceSafe)
+	out := Render(a2)
+	if strings.Contains(strings.ReplaceAll(out, "\r\n", ""), "\n") {
+		t.Errorf("rewritten CRLF file contains bare LF line endings:\n%q", out)
+	}
+	if !strings.Contains(out, "--no-install-recommends") {
+		t.Error("the rewrite did not happen, so this proves nothing")
+	}
+	if _, err := analyzer.Parse(strings.NewReader(out)); err != nil {
+		t.Fatalf("rewritten CRLF file does not parse: %v", err)
+	}
+}
+
+func TestParse_leaves_an_lf_file_as_lf(t *testing.T) {
+	a, err := analyzer.Parse(strings.NewReader("FROM alpine:3.21\nCMD [\"true\"]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Newline != "\n" {
+		t.Errorf("Newline = %q, want LF", a.Newline)
+	}
+	if strings.Contains(Render(a), "\r") {
+		t.Error("an LF file gained carriage returns")
+	}
+}
