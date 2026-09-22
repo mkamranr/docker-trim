@@ -1,0 +1,13 @@
+# Used only by the release pipeline, which has already cross-compiled the
+# binary and passes a context containing just that. The repository's Dockerfile
+# is the one to build from source.
+#
+# distroless/static suits dtrim exactly: the binary is static, and the image it
+# lands in has no shell and no package manager, which is the arrangement dtrim
+# spends its time recommending.
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY dtrim /usr/local/bin/dtrim
+
+WORKDIR /work
+ENTRYPOINT ["dtrim"]

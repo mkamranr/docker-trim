@@ -1,5 +1,5 @@
 # dtrim's own image. It has to pass dtrim's analysis: multi-stage, no package
-# manager in the final stage, non-root, pinned bases.
+# manager or shell in the final stage, non-root, pinned bases.
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
@@ -17,15 +17,11 @@ RUN CGO_ENABLED=0 go build -trimpath \
     -ldflags "-s -w -X github.com/mkamranr/dtrim/internal/version.version=${VERSION} -X github.com/mkamranr/dtrim/internal/version.commit=${COMMIT} -X github.com/mkamranr/dtrim/internal/version.date=${DATE}" \
     -o /src/bin/dtrim .
 
-FROM alpine:3.21
-
-# dtrim shells out to `docker` for --verify only; the client is optional and is
-# not installed here, so the image stays small and shell-light.
-RUN adduser -D -u 10001 dtrim
+# The binary is static, so it needs no libc; distroless/static ships a trust
+# store for talking to registries and a nonroot user, and nothing else.
+FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=builder /src/bin/dtrim /usr/local/bin/dtrim
 
-USER 10001:10001
 WORKDIR /work
-
 ENTRYPOINT ["dtrim"]
