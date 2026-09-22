@@ -1,0 +1,22 @@
+# ecosystem: java
+# restructured: yes
+# builder: maven:3.9-eclipse-temurin-21
+# runtime: eclipse-temurin:21-jre-alpine
+# ---
+FROM maven:3.9-eclipse-temurin-21 AS builder
+
+WORKDIR /workspace
+
+COPY . .
+
+RUN mvn -B package -DskipTests
+
+# dtrim(DT100): runtime stage carries the application and nothing else
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /workspace
+# dtrim(DT101): only the build output crosses the stage boundary
+COPY --from=builder --chown=10001:10001 /workspace/target/app.jar /workspace/target/app.jar
+EXPOSE 8080
+# dtrim(DT010): drop privileges before the process starts
+USER 10001:10001
+ENTRYPOINT ["java","-jar","/workspace/target/app.jar"]

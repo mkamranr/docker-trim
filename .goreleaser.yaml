@@ -1,0 +1,92 @@
+version: 2
+
+project_name: dtrim
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/mkamranr/dtrim/internal/version.version={{.Version}}
+      - -X github.com/mkamranr/dtrim/internal/version.commit={{.ShortCommit}}
+      - -X github.com/mkamranr/dtrim/internal/version.date={{.Date}}
+
+archives:
+  - name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - CHANGELOG.md
+      - LICENSE-MIT
+      - LICENSE-APACHE
+
+checksum:
+  name_template: SHA256SUMS
+
+changelog:
+  use: github-native
+
+release:
+  github:
+    owner: mkamranr
+    name: dtrim
+  draft: false
+
+brews:
+  - name: dtrim
+    repository:
+      owner: mkamranr
+      name: homebrew-tap
+      token: "{{ .Env.TAP_TOKEN }}"
+    commit_author:
+      name: dtrim release bot
+      email: noreply@github.com
+    commit_msg_template: "dtrim {{ .Version }}"
+    homepage: https://github.com/mkamranr/dtrim
+    description: Shrink container images and cut their attack surface
+    license: "MIT OR Apache-2.0"
+    test: |
+      system "#{bin}/dtrim", "--version"
+
+dockers:
+  - image_templates:
+      - "ghcr.io/mkamranr/dtrim:{{ .Tag }}-amd64"
+      - "ghcr.io/mkamranr/dtrim:latest-amd64"
+    use: buildx
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=VERSION={{ .Version }}"
+      - "--build-arg=COMMIT={{ .ShortCommit }}"
+      - "--build-arg=DATE={{ .Date }}"
+  - image_templates:
+      - "ghcr.io/mkamranr/dtrim:{{ .Tag }}-arm64"
+      - "ghcr.io/mkamranr/dtrim:latest-arm64"
+    use: buildx
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=VERSION={{ .Version }}"
+      - "--build-arg=COMMIT={{ .ShortCommit }}"
+      - "--build-arg=DATE={{ .Date }}"
+
+docker_manifests:
+  - name_template: "ghcr.io/mkamranr/dtrim:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/mkamranr/dtrim:{{ .Tag }}-amd64"
+      - "ghcr.io/mkamranr/dtrim:{{ .Tag }}-arm64"
+  - name_template: "ghcr.io/mkamranr/dtrim:latest"
+    image_templates:
+      - "ghcr.io/mkamranr/dtrim:latest-amd64"
+      - "ghcr.io/mkamranr/dtrim:latest-arm64"

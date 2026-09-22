@@ -1,0 +1,23 @@
+# ecosystem: java
+# restructured: yes
+# builder: maven:3.9-eclipse-temurin-21
+# runtime: gcr.io/distroless/java21-debian12:nonroot
+# ---
+FROM maven:3.9-eclipse-temurin-21 AS builder
+
+WORKDIR /workspace
+
+COPY . .
+
+RUN mvn -B package -DskipTests
+
+# dtrim(DT100): runtime stage carries the application and nothing else
+FROM gcr.io/distroless/java21-debian12:nonroot
+WORKDIR /workspace
+# dtrim(DT101): only the build output crosses the stage boundary
+COPY --from=builder --chown=nonroot:nonroot /workspace/target/app.jar /workspace/target/app.jar
+EXPOSE 8080
+# dtrim(DT010): drop privileges before the process starts
+USER nonroot:nonroot
+# dtrim(DT102): gcr.io/distroless/java21-debian12:nonroot supplies the interpreter as its entrypoint
+CMD ["/workspace/target/app.jar"]

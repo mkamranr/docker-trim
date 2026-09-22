@@ -1,0 +1,16 @@
+# ecosystem: unknown
+# restructured: no
+# reason: no recognisable build step, so dtrim cannot tell what the runtime stage would need to copy. Applying cleanups to the single stage instead.
+# ---
+# No recognisable build step. dtrim must refuse to invent a builder stage
+# and fall back to safe cleanups only.
+FROM debian:bookworm
+
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y nginx curl \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY site/ /var/www/html/
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

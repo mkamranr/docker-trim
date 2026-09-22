@@ -1,0 +1,14 @@
+# Build output
+/dtrim
+/dist/
+/bin/
+
+# Test artifacts
+/tests/fixtures/generated/
+*.out
+*.test
+
+# Internal requirements document, not part of the published project
+prd_specification.md
+
+.DS_Store

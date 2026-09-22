@@ -1,0 +1,35 @@
+# ecosystem: node
+# restructured: yes
+# builder: node:18-alpine
+# runtime: node:18-alpine
+# ---
+# A typical bloated Node service: full node image, dev dependencies,
+# build toolchain left in, npm cache shipped, running as root.
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y curl wget git build-essential python3 \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+RUN npm install \
+ && npm cache clean --force
+RUN npm run build
+
+ENV NODE_ENV=production
+# dtrim(DT103): added by dtrim so the runtime stage can be minimal
+RUN npm prune --omit=dev
+
+# dtrim(DT100): runtime stage carries the application and nothing else
+FROM node:18-alpine
+WORKDIR /app
+# dtrim(DT101): only the build output crosses the stage boundary
+COPY --from=builder --chown=node:node /app /app
+ENV NODE_ENV=production
+EXPOSE 3000
+# dtrim(DT010): drop privileges before the process starts
+USER node
+CMD ["node","dist/server.js"]

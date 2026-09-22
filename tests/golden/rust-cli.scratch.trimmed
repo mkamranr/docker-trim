@@ -1,0 +1,26 @@
+# ecosystem: rust
+# restructured: yes
+# builder: rust:1.83
+# runtime: scratch
+# warning: scratch only works for a fully static binary. Build for x86_64-unknown-linux-musl, or use --base distroless.
+# ---
+FROM rust:1.83 AS builder
+
+WORKDIR /build
+
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y pkg-config libssl-dev curl \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+RUN cargo build --release
+
+# dtrim(DT100): runtime stage carries the application and nothing else
+FROM scratch
+WORKDIR /build
+# dtrim(DT101): only the build output crosses the stage boundary
+COPY --from=builder --chown=10001:10001 /build/target/release/mytool /build/target/release/mytool
+# dtrim(DT010): drop privileges before the process starts
+USER 10001:10001
+ENTRYPOINT ["/build/target/release/mytool"]

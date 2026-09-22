@@ -1,0 +1,29 @@
+# ecosystem: go
+# restructured: yes
+# builder: golang:1.24
+# runtime: gcr.io/distroless/static-debian12:nonroot
+# warning: CGO_ENABLED=0 was set in the builder so the binary is static and depends on no libc. If the project genuinely needs cgo, build on an image matching the runtime's libc and remove that line.
+# ---
+FROM golang:1.24 AS builder
+# dtrim(DT103): added by dtrim so the runtime stage can be minimal
+ENV CGO_ENABLED=0
+
+WORKDIR /src
+
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y git make ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+RUN go build -o /src/bin/api ./cmd/api
+
+# dtrim(DT100): runtime stage carries the application and nothing else
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /src
+# dtrim(DT101): only the build output crosses the stage boundary
+COPY --from=builder --chown=nonroot:nonroot /src/bin/api /src/bin/api
+EXPOSE 8080
+# dtrim(DT010): drop privileges before the process starts
+USER nonroot:nonroot
+CMD ["/src/bin/api"]

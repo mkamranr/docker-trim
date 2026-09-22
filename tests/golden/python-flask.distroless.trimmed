@@ -1,0 +1,36 @@
+# ecosystem: python
+# restructured: yes
+# builder: python:3.12-slim
+# runtime: python:3.12-slim
+# warning: The runtime stage stays on python:3.12-slim rather than moving to distroless. Python resolves dependencies against the exact interpreter build that runs pip, so copying an installed tree onto a different CPython patch release can fail at import time. The saving here comes from leaving the build toolchain behind.
+# ---
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y gcc g++ curl vim netcat-openbsd libpq-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+# dtrim(DT105): install into /install so the runtime stage can copy it whole
+RUN pip install --no-cache-dir -r requirements.txt --target=/install
+
+COPY . .
+
+ENV PYTHONUNBUFFERED=1
+
+# dtrim(DT100): runtime stage carries the application and nothing else
+FROM python:3.12-slim
+WORKDIR /app
+# dtrim(DT101): only the build output crosses the stage boundary
+COPY --from=builder --chown=10001:10001 /install /install
+COPY --from=builder --chown=10001:10001 /app /app
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8000
+# dtrim(DT104): point the interpreter at the copied dependency tree
+ENV PYTHONPATH=/install
+ENV PATH=/install/bin:$PATH
+# dtrim(DT010): drop privileges before the process starts
+USER 10001:10001
+CMD ["gunicorn","-b","0.0.0.0:8000","app:app"]

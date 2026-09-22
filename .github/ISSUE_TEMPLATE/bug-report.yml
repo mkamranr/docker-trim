@@ -1,0 +1,30 @@
+name: Bug report
+description: Something other than a rewrite went wrong
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If dtrim rewrote a Dockerfile badly, please use the **Bad rewrite** template instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and platform
+      description: Output of `dtrim --version`.
+    validations:
+      required: true

@@ -1,0 +1,17 @@
+# ecosystem: rust
+# restructured: no
+# reason: alpine is musl, but this build produces a glibc binary, which will not run there. Add `--target x86_64-unknown-linux-musl` to the cargo build and run dtrim again, or use --base distroless.
+# ---
+FROM rust:1.83
+
+WORKDIR /build
+
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y pkg-config libssl-dev curl \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+RUN cargo build --release
+
+ENTRYPOINT ["/build/target/release/mytool"]

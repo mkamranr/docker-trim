@@ -1,0 +1,50 @@
+name: Bad rewrite
+description: dtrim produced a Dockerfile that does not build, does not run, or should not have been changed
+title: "[rewrite] "
+labels: ["bad-rewrite"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful issue you can open. dtrim rewrites other people's builds, and
+        the only way it stays trustworthy is if the cases where it gets them wrong come back.
+
+        If the rewritten image built but exited, please check the container logs first: a
+        service that needs a database it cannot reach will exit on its own, and that is not a
+        dtrim bug. A missing module, a missing shared library or a missing interpreter is.
+  - type: textarea
+    id: input
+    attributes:
+      label: The Dockerfile you gave dtrim
+      render: dockerfile
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What dtrim produced
+      render: dockerfile
+    validations:
+      required: true
+  - type: textarea
+    id: broke
+    attributes:
+      label: What went wrong
+      description: The build error, the container logs, or what the rewrite should have done instead.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: The command you ran
+      placeholder: dtrim -f Dockerfile --optimize --base distroless --verify
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and platform
+      description: Output of `dtrim --version`, plus your Docker version.
+    validations:
+      required: true
