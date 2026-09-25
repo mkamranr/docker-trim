@@ -42,7 +42,7 @@ func TestGolden(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				res := synthesizer.Optimize(a, base, analyzer.ConfidenceLikely)
+				res := synthesizer.Optimize(a, synthesizer.Options{Base: base, Aggressiveness: analyzer.ConfidenceLikely})
 				got := header(res) + synthesizer.Render(a)
 
 				path := filepath.Join("golden", name+".trimmed")

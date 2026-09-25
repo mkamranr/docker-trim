@@ -10,7 +10,7 @@ import (
 func optimize(t *testing.T, fixture string, base Base) (*Result, string) {
 	t.Helper()
 	a := parseFixture(t, fixture)
-	r := Optimize(a, base, analyzer.ConfidenceLikely)
+	r := Optimize(a, Options{Base: base, Aggressiveness: analyzer.ConfidenceLikely})
 	out := Render(a)
 	if _, err := analyzer.Parse(strings.NewReader(out)); err != nil {
 		t.Fatalf("emitted Dockerfile does not parse: %v\n%s", err, out)
@@ -223,7 +223,7 @@ func TestOptimize_declines_a_split_that_would_save_nothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := Optimize(a, BaseDistroless, analyzer.ConfidenceLikely)
+	r := Optimize(a, Options{Base: BaseDistroless, Aggressiveness: analyzer.ConfidenceLikely})
 
 	if r.Restructured {
 		t.Error("split a build whose runtime base equals its builder base and installs nothing")
@@ -300,7 +300,7 @@ func TestOptimize_is_stable_under_a_second_pass(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			Optimize(a, BaseDistroless, analyzer.ConfidenceLikely)
+			Optimize(a, Options{Base: BaseDistroless, Aggressiveness: analyzer.ConfidenceLikely})
 			second := Render(a)
 
 			if first != second {

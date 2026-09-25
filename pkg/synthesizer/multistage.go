@@ -22,9 +22,35 @@ type Result struct {
 	// Findings are the rule findings that were fixed, plus what remains.
 	Fixed     []analyzer.Finding
 	Remaining []analyzer.Finding
+	// Pruned are packages dropped from an install command because a trace
+	// never saw them used.
+	Pruned []string
+	// RuntimeGaps are things the trace saw the program use that the chosen
+	// runtime base will not provide.
+	RuntimeGaps []RuntimeGap
 	// Notes are human-readable statements about what happened, shown in the
 	// report and written into the file as comments.
 	Notes []string
+}
+
+// Options control a rewrite.
+type Options struct {
+	// Base is the minimal runtime the final stage should land on.
+	Base Base
+	// Aggressiveness gates which rules may repair what they find.
+	Aggressiveness analyzer.Confidence
+	// Usage is what a runtime trace observed, when one was run. It lets the
+	// synthesizer check its own work: a trace knows which binaries the program
+	// actually executes, and a minimal runtime that lacks one of them produces
+	// an image that builds cleanly and fails in production.
+	Usage *analyzer.Usage
+	// Trace is the raw manifest behind Usage.
+	Trace *analyzer.TraceManifest
+	// PruneUnused drops packages the trace never touched from the install
+	// commands that name them. It only ever applies to a stage that ships,
+	// never to a builder: a trace observes the finished image and says nothing
+	// about what compiling it required.
+	PruneUnused bool
 }
 
 // Optimize rewrites an analyzed Dockerfile.
@@ -32,7 +58,8 @@ type Result struct {
 // It refuses to restructure a file that already builds in stages: the author
 // has made those decisions, and a tool that silently rearranges them is a tool
 // people uninstall. Such a file still gets the safe in-place cleanups.
-func Optimize(a *analyzer.Analysis, base Base, aggressiveness analyzer.Confidence) *Result {
+func Optimize(a *analyzer.Analysis, opts Options) *Result {
+	base, aggressiveness := opts.Base, opts.Aggressiveness
 	res := &Result{Analysis: a}
 
 	if a.MultiStage() {
@@ -41,6 +68,9 @@ func Optimize(a *analyzer.Analysis, base Base, aggressiveness analyzer.Confidenc
 				"alone and applied cleanups only."}
 		res.Notes = append(res.Notes, res.Plan.Reason)
 		res.Fixed, res.Remaining = analyzer.FixAll(a, aggressiveness)
+		// Nothing was restructured, so the packages the final stage installs
+		// are the ones that ship. This is where a trace pays off directly.
+		res.Pruned = pruneUnused(a, opts)
 		return res
 	}
 
@@ -50,6 +80,7 @@ func Optimize(a *analyzer.Analysis, base Base, aggressiveness analyzer.Confidenc
 			res.Notes = append(res.Notes, res.Plan.Reason)
 		}
 		res.Fixed, res.Remaining = analyzer.FixAll(a, aggressiveness)
+		res.Pruned = pruneUnused(a, opts)
 		return res
 	}
 
@@ -74,12 +105,22 @@ func Optimize(a *analyzer.Analysis, base Base, aggressiveness analyzer.Confidenc
 		}
 		res.Notes = append(res.Notes, res.Plan.Reason)
 		res.Fixed, res.Remaining = analyzer.FixAll(a, aggressiveness)
+		res.Pruned = pruneUnused(a, opts)
 		return res
 	}
 
 	// Clean up first: the builder stage inherits those fixes, and the runtime
 	// stage is built fresh so nothing needs cleaning there.
 	res.Fixed, res.Remaining = analyzer.FixAll(a, aggressiveness)
+
+	// A trace knows what the program actually runs. Checking that against what
+	// the chosen runtime will contain catches the failure mode this tool could
+	// otherwise cause: an image that is dramatically smaller, builds cleanly,
+	// and then dies in production because something it shells out to is gone.
+	// Kept out of Plan.Warnings deliberately: the reporter gives gaps their own
+	// block, and a warning that also appears in the notes reads as two separate
+	// problems.
+	res.RuntimeGaps = checkRuntimeCoverage(res.Plan, opts.Trace)
 
 	restructure(a, res.Plan)
 	res.Restructured = true

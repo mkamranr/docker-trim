@@ -50,7 +50,7 @@ func TestReductionBands(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			res := synthesizer.Optimize(a, synthesizer.BaseDistroless, analyzer.ConfidenceLikely)
+			res := synthesizer.Optimize(a, synthesizer.Options{Base: synthesizer.BaseDistroless, Aggressiveness: analyzer.ConfidenceLikely})
 			if !res.Restructured {
 				t.Fatalf("declined to restructure %s: %s", name, res.Plan.Reason)
 			}

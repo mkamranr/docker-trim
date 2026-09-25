@@ -111,6 +111,18 @@ where the binary lands.
 | A running container (`--tracer`) | Runs it and records what it actually touches, then attributes those files back to the packages that installed them, so you can see what was never used. `proc` samples `/proc` and needs no privileges; `ptrace` observes every syscall and misses nothing |
 | A built image | Streams its layers and reports where the bytes went: caches, docs, locales, bytecode, files written then overwritten, files deleted but still shipped |
 
+When a trace is available, it also checks its own work. A Go service that shells out, rewritten
+onto distroless, goes from 909 MB to 4.8 MB and then prints
+`fork/exec /bin/sh: no such file or directory`. It builds cleanly, so nothing catches it until
+production — unless something watched the program run first:
+
+```
+Runtime gaps
+  the trace saw these run, and the new base will not have them
+  ! The trace saw `/bin/sh` executed, but a distroless base has no shell and no general
+    userland, so that binary will not exist there.
+```
+
 It also knows when to do nothing. A Dockerfile that already builds in stages is left alone,
 because the author has already made those decisions. A build it cannot identify does not
 get a builder stage invented for it.
@@ -153,6 +165,7 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--verify` | | `false` | Build both images, measure them, and start the trimmed one |
 | `--analyze-only` | | `false` | Report only; never writes anything |
 | `--fail-on` | | | Exit 1 when a finding of this severity or worse survives |
+| `--prune-unused` | | `false` | Drop packages a trace never saw used; needs `--tracer` |
 | `--aggressiveness` | | `likely` | How much to change: `safe`, `likely`, `aggressive` |
 | `--quiet` | `-q` | `false` | Emit the JSON report on stdout and nothing else |
 | `--markdown` | | `false` | Emit a report for a pull request comment |

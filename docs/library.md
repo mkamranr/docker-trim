@@ -64,7 +64,10 @@ For finer control, the stages compose on their own:
 ```go
 a, err := analyzer.ParseFile("Dockerfile")       // -> *analyzer.Analysis
 findings := analyzer.Lint(a)                     // report only, no mutation
-res := synthesizer.Optimize(a, synthesizer.BaseDistroless, analyzer.ConfidenceLikely)
+res := synthesizer.Optimize(a, synthesizer.Options{
+    Base:           synthesizer.BaseDistroless,
+    Aggressiveness: analyzer.ConfidenceLikely,
+})
 out := synthesizer.Render(a)                     // the rewritten Dockerfile
 
 img, err := analyzer.InspectImage(ctx, "myapp:latest")
@@ -73,3 +76,26 @@ surface := security.EvaluateImage(img)
 
 `Optimize` mutates the `Analysis` in place and reports what it decided in `res.Plan`, including
 `res.Plan.Reason` when it declined to restructure.
+
+Give it a trace and it checks its own work:
+
+```go
+res, _ := tr.Trace(ctx, topts)                   // tracer.Result
+usage := analyzer.AttributeUsage(img, res.Manifest)
+
+plan := synthesizer.Optimize(a, synthesizer.Options{
+    Base:           synthesizer.BaseDistroless,
+    Aggressiveness: analyzer.ConfidenceLikely,
+    Trace:          &res.Manifest,               // enables runtime-gap checking
+    Usage:          &usage,                      // required by PruneUnused
+    PruneUnused:    true,
+})
+
+for _, gap := range plan.RuntimeGaps {
+    // Something the program ran that the new base will not have.
+    log.Println(gap.Explain())
+}
+```
+
+`RuntimeGaps` is the one field worth checking before shipping a rewrite: it is populated only
+when a trace observed the program executing a binary the chosen runtime base cannot provide.

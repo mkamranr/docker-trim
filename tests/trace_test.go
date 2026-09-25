@@ -7,11 +7,13 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/dtrim/pkg/synthesizer"
 	"github.com/mkamranr/dtrim/pkg/tracer"
 )
 
@@ -343,5 +345,88 @@ func TestPtraceTracer_is_transparent_to_the_container(t *testing.T) {
 	}
 	if res.ExitCode != 9 {
 		t.Errorf("exit code = %d, want the container's own 9", res.ExitCode)
+	}
+}
+
+// The failure dtrim is most capable of causing, and the reason the tracer feeds
+// the synthesizer: an image that is dramatically smaller, builds cleanly, and
+// dies the first time the program shells out. Static analysis cannot see it.
+//
+// This builds the broken image on purpose and confirms both that it is broken
+// and that dtrim said so in advance.
+func TestTrace_warns_before_a_rewrite_breaks_the_program(t *testing.T) {
+	ctx := requireDocker(t)
+	dir := t.TempDir()
+
+	write := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module example.com/shellout\n\ngo 1.24\n")
+	write("main.go", "package main\n\nimport (\n\t\"fmt\"\n\t\"os/exec\"\n)\n\n"+
+		"func main() {\n\tout, err := exec.Command(\"/bin/sh\", \"-c\", \"echo ok\").Output()\n"+
+		"\tfmt.Println(string(out), err)\n}\n")
+	write("Dockerfile", "FROM golang:1.25-alpine\nWORKDIR /src\nCOPY . .\n"+
+		"RUN go build -o /src/bin/app .\nCMD [\"/src/bin/app\"]\n")
+
+	const tag = "dtrim-trace-it:shellout"
+	out, err := exec.Command("docker", "build", "-q", "-t", tag, dir).CombinedOutput()
+	if err != nil {
+		t.Fatalf("building the fixture: %v\n%s", err, out)
+	}
+	t.Cleanup(func() { tracer.Remove(context.Background(), tag) })
+
+	// Trace it, then plan the rewrite with what the trace found.
+	tr, _ := tracer.New(tracer.BackendPtrace)
+	topts := tracer.DefaultOptions()
+	topts.Image = tag
+	topts.Timeout = 60 * time.Second
+	res, err := tr.Trace(ctx, topts)
+	if err != nil {
+		t.Fatalf("tracing: %v", err)
+	}
+
+	a, err := analyzer.ParseFile(filepath.Join(dir, "Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := synthesizer.Optimize(a, synthesizer.Options{
+		Base:           synthesizer.BaseDistroless,
+		Aggressiveness: analyzer.ConfidenceLikely,
+		Trace:          &res.Manifest,
+	})
+
+	if !plan.Restructured {
+		t.Fatalf("declined to restructure: %s", plan.Plan.Reason)
+	}
+	if len(plan.RuntimeGaps) == 0 {
+		t.Fatal("the program shells out and the runtime has no shell, but dtrim did not say so")
+	}
+	var named bool
+	for _, g := range plan.RuntimeGaps {
+		if strings.Contains(g.Binary, "sh") {
+			named = true
+		}
+	}
+	if !named {
+		t.Errorf("the gaps do not name a shell: %+v", plan.RuntimeGaps)
+	}
+
+	// Now prove the warning was right, rather than taking dtrim's word for it.
+	trimmedPath := filepath.Join(dir, "Dockerfile.trimmed")
+	if err := os.WriteFile(trimmedPath, []byte(synthesizer.Render(a)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const trimTag = "dtrim-trace-it:shellout-trimmed"
+	t.Cleanup(func() { tracer.Remove(context.Background(), trimTag) })
+	if _, err := tracer.Build(ctx, tracer.BuildRequest{
+		Dockerfile: trimmedPath, Context: dir, Tag: trimTag}); err != nil {
+		t.Fatalf("the trimmed Dockerfile does not build: %v", err)
+	}
+
+	logs, _ := exec.Command("docker", "run", "--rm", trimTag).CombinedOutput()
+	if !strings.Contains(string(logs), "no such file") {
+		t.Errorf("the trimmed image ran fine, so the warning was a false positive:\n%s", logs)
 	}
 }

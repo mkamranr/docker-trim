@@ -147,6 +147,18 @@ processes, so dtrim reports how long the command ran and says so when that was u
 second. `docs/heuristics.md` and [tracing.md](tracing.md) explain what it can and cannot see.
 Removal is left to you: dtrim reports what to consider dropping and deletes nothing.
 
+### `--prune-unused`
+
+Drop packages a trace never saw used from the install commands that name them. Needs
+`--tracer`, because without evidence there is nothing to act on.
+
+It applies only to the final stage of a file that already builds in stages. A builder is
+never touched: a runtime trace says nothing about what compiling the image required, and a
+single-stage file's install serves both. `docs/heuristics.md` explains why, including why
+this drops packages from the install rather than purging them later.
+
+Pair it with `--verify`, which builds the result and starts it.
+
 ### `--osv`
 
 Accepted, and rejected with a pointer to the changelog. It exists so scripts written today

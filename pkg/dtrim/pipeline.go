@@ -96,6 +96,12 @@ type DockerfileReport struct {
 	Trimmed  string `json:"-"`
 	// Warnings are things the author needs to know before building the result.
 	Warnings []string `json:"warnings,omitempty"`
+	// Pruned are packages dropped because a trace never saw them used.
+	Pruned []string `json:"prunedPackages,omitempty"`
+	// RuntimeGaps are binaries the trace saw running that the new runtime base
+	// will not provide. These are the reason to read the report before
+	// shipping the result.
+	RuntimeGaps []string `json:"runtimeGaps,omitempty"`
 }
 
 // Run executes the pipeline described in the PRD: parse and analyze, inspect
@@ -137,6 +143,7 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 		}
 	}
 
+	// After the image and any trace, so the rewrite can use what they found.
 	if cfg.File != "" {
 		if err := runDockerfile(ctx, cfg, rep); err != nil {
 			return nil, err
@@ -182,7 +189,18 @@ func runDockerfile(ctx context.Context, cfg Config, rep *Report) error {
 		return nil
 	}
 
-	res := synthesizer.Optimize(a, cfg.Base, cfg.Aggressiveness)
+	opts := synthesizer.Options{
+		Base:           cfg.Base,
+		Aggressiveness: cfg.Aggressiveness,
+		PruneUnused:    cfg.PruneUnused,
+	}
+	// A trace, when one was run, tells the synthesizer what the program
+	// actually uses. Without it the rewrite is a well-informed guess.
+	if rep.Trace != nil {
+		opts.Usage = &rep.Trace.Usage
+		opts.Trace = &rep.Trace.Manifest
+	}
+	res := synthesizer.Optimize(a, opts)
 	trimmed := synthesizer.Render(a)
 
 	df.Ecosystem = string(res.Plan.Ecosystem)
@@ -198,6 +216,10 @@ func runDockerfile(ctx context.Context, cfg Config, rep *Report) error {
 	rep.Fixed = res.Fixed
 	rep.Findings = res.Remaining
 	rep.Notes = append(rep.Notes, res.Notes...)
+	df.Pruned = res.Pruned
+	for _, g := range res.RuntimeGaps {
+		df.RuntimeGaps = append(df.RuntimeGaps, g.Explain())
+	}
 	rep.Result.RemovedPackagesCount = len(res.Fixed)
 
 	after := security.EvaluateDockerfile(a)

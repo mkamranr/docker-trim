@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The tracer now informs the rewrite.** They were two halves that did not talk: dtrim could
+  see which packages went untouched and could write a minimal Dockerfile, but could not write
+  one that used what it saw.
+
+  A trace knows which binaries a program actually executes, so dtrim now checks the rewrite
+  against it and reports a **runtime gap** when the chosen base will not contain something the
+  program ran. This is the failure dtrim is most capable of causing: a Go service that shells
+  out, rewritten onto distroless, goes from 909 MB to 4.8 MB and then prints
+  `fork/exec /bin/sh: no such file or directory`. It builds cleanly, so nothing catches it
+  until production. An integration test builds that broken image deliberately and confirms
+  dtrim predicted it.
+
+- **`--prune-unused`** drops packages a trace never saw used from the install commands that
+  name them. It removes them from the install rather than purging them afterwards, because a
+  purge in a later layer makes the image bigger while looking like a cleanup, which is what
+  dtrim reports as DT002 in other people's files. It only touches a stage that ships: a
+  runtime trace says nothing about what building the image required, so pruning a builder on
+  that evidence would break the build, and a single-stage file's install serves both.
+
+### Changed
+
+- **`synthesizer.Optimize` takes an options struct** rather than three positional arguments,
+  so trace data can reach it. A library caller passing `(a, base, confidence)` becomes
+  `(a, synthesizer.Options{Base: base, Aggressiveness: confidence})`.
+
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose

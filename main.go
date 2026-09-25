@@ -78,6 +78,7 @@ type flags struct {
 	osv            bool
 	buildContext   string
 	failOn         string
+	pruneUnused    bool
 	traceTimeout   time.Duration
 	noColor        bool
 	verbose        bool
@@ -144,6 +145,7 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	fl.DurationVar(&f.traceTimeout, "trace-timeout", 30*time.Second, "How long to let a traced container run")
 	fl.BoolVar(&f.osv, "osv", false, "Look up real CVEs from api.osv.dev (not implemented yet)")
 	fl.StringVar(&f.buildContext, "context", "", "Build context directory (default: the Dockerfile's directory)")
+	fl.BoolVar(&f.pruneUnused, "prune-unused", false, "Drop packages a runtime trace never saw used; needs --tracer")
 	fl.StringVar(&f.failOn, "fail-on", "", "Exit 1 when a finding of this severity or worse survives: info, low, medium, high, critical")
 	fl.BoolVar(&f.noColor, "no-color", false, "Disable coloured output")
 	fl.BoolVar(&f.verbose, "verbose", false, "Show every finding rather than the most important ones")
@@ -205,6 +207,7 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 	cfg.OSV = f.osv
 	cfg.Context = f.buildContext
 	cfg.TraceTimeout = f.traceTimeout
+	cfg.PruneUnused = f.pruneUnused
 	cfg.NoColor = f.noColor
 	cfg.Verbose = f.verbose
 

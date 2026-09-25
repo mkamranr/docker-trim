@@ -87,6 +87,52 @@ twice. These were read from the published image configurations, not assumed:
 | `distroless/java<N>` | `/usr/bin/java -jar` | `CMD ["/path/app.jar"]`, with `java` and `-jar` stripped |
 | `distroless/static`, `cc` | none | The original `ENTRYPOINT` and `CMD`, unchanged |
 
+## Checking the rewrite against what the program actually does
+
+A minimal runtime is only correct if the program never needed what was removed. Static
+analysis cannot tell: nothing in a Dockerfile says "this service shells out to `curl` in its
+error path". A trace can, and when one is available the synthesizer uses it.
+
+If the trace saw a binary execute that the chosen runtime will not contain, dtrim reports it
+as a **runtime gap** before you build:
+
+```console
+$ dtrim --image myapp:latest -f Dockerfile --tracer ptrace --optimize
+Runtime gaps
+  the trace saw these run, and the new base will not have them
+  ! The trace saw `/bin/sh` executed, but a distroless base has no shell and no general
+    userland, so that binary will not exist there.
+```
+
+That example is real. The program was a Go service that shells out; the rewrite took it from
+909 MB to 4.8 MB, a 99.5% reduction, and the result printed
+`fork/exec /bin/sh: no such file or directory` the first time it ran. It built cleanly, which
+is what makes this failure mode worth predicting: nothing catches it until production.
+
+Gaps are reported conservatively. A binary is only flagged when its absence is a property of
+the base — scratch contains nothing, distroless has no shell, alpine has no `bash` or `curl`
+— and anything being copied across the stage boundary is present by definition. A warning
+that fires on something that turns out to be there is how a tool teaches people to ignore its
+warnings.
+
+## Removing packages nothing used
+
+`--prune-unused` drops packages a trace never saw used. Two constraints shape it, and both
+are easy to get wrong in a way that looks like it worked:
+
+**It removes them from the install, rather than purging them afterwards.** A purge in a later
+`RUN` cannot shrink an earlier layer, so appending one makes the image *larger* while
+appearing to clean up. dtrim reports exactly that as `DT002` in other people's Dockerfiles.
+
+**It only ever touches a stage that ships, never a builder.** A trace observes the finished
+image running, so it knows nothing about what compiling it required — the compiler a builder
+needs is precisely the sort of thing a runtime trace never sees. For the same reason it
+declines single-stage files outright: there, one install serves both the build and the
+runtime, and no runtime trace can separate them.
+
+What is left is the final stage of a file that already builds in stages, which is exactly the
+case where dtrim otherwise says "I left the structure alone". Pair it with `--verify`.
+
 ## What dtrim deliberately does not do
 
 - **It does not reorder your instructions.** `COPY . .` before a dependency install is
@@ -94,9 +140,10 @@ twice. These were read from the published image configurations, not assumed:
   needs, and only you know that.
 - **It does not pin your base image.** A floating tag is reported. Choosing the digest is a
   decision about your supply chain, not a formatting fix.
-- **It does not remove packages, even ones a trace never touched.** `--tracer proc` reports
-  what went unused; deleting it is your call. A trace only covers the code paths you
-  exercised, and the package that goes unused all week is the one your error handler needs.
+- **It does not remove packages unless you ask.** A trace reports what went unused;
+  `--prune-unused` acts on it, and without that flag dtrim deletes nothing. A trace only
+  covers the code paths you exercised, and the package that goes unused all week is the one
+  your error handler needs.
 - **It does not rewrite an already multi-stage file.**
 - **It does not touch the network**, except when you pass `--image` with a reference the local
   daemon does not have, or `--verify`, which builds.

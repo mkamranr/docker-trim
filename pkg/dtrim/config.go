@@ -57,6 +57,9 @@ type Config struct {
 	// Context is the build context directory. Defaults to the Dockerfile's
 	// directory.
 	Context string
+	// PruneUnused drops packages a trace never saw used from the install
+	// commands that name them.
+	PruneUnused bool
 	// FailOn makes dtrim exit non-zero when a finding of this severity or
 	// worse survives. Empty means never fail on findings, which is the
 	// default: a report is not an error unless you asked for it to be.
@@ -107,6 +110,10 @@ func (c *Config) Validate() error {
 	}
 	if c.Trace != "" && c.Tracer == TracerNone {
 		return fmt.Errorf("--trace needs a tracing backend: add --tracer proc")
+	}
+	if c.PruneUnused && c.Tracer == TracerNone {
+		return fmt.Errorf("--prune-unused needs evidence: add --tracer proc or --tracer ptrace, " +
+			"and --trace with a command that exercises the application")
 	}
 	if c.Tracer != TracerNone {
 		if c.Image == "" {

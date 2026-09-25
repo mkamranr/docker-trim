@@ -87,6 +87,7 @@ func Text(w io.Writer, rep *dtrim.Report, opt Options) error {
 	writeTrace(b, p, rep, opt)
 	writeFindings(b, p, rep, opt)
 	writeSummary(b, p, rep)
+	writeGaps(b, p, rep)
 	writeWarnings(b, p, rep)
 	writeGate(b, p, rep, opt)
 
@@ -159,6 +160,10 @@ func writeProgress(b *strings.Builder, p palette, rep *dtrim.Report) {
 			verb = "Created Multi-Stage Dockerfile"
 		}
 		fmt.Fprintf(b, "%s %s -> %s\n", tag, verb, df.Output)
+	}
+	if df := rep.Dockerfile; df != nil && len(df.Pruned) > 0 {
+		fmt.Fprintf(b, "%s Dropped %d unused %s from the install: %s\n", tag,
+			len(df.Pruned), plural("package", len(df.Pruned)), strings.Join(df.Pruned, ", "))
 	}
 	if v := rep.Verification; v != nil {
 		switch {
@@ -329,6 +334,23 @@ func writeBloat(b *strings.Builder, p palette, img *analyzer.ImageReport) {
 		}
 		fmt.Fprintf(b, "  %-18s: %-9s %s\n", c.name, humanize.Bytes(uint64(c.bytes)),
 			p.dim("("+analyzer.BloatExplanation(c.name)+")"))
+	}
+}
+
+// writeGaps reports binaries the trace saw running that the new runtime will
+// not have.
+//
+// This gets its own block above the notes because it is the one thing in the
+// report that predicts a production failure rather than describing a saving.
+func writeGaps(b *strings.Builder, p palette, rep *dtrim.Report) {
+	df := rep.Dockerfile
+	if df == nil || len(df.RuntimeGaps) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "\n%s\n", p.bad("Runtime gaps"))
+	fmt.Fprintf(b, "  %s\n", p.dim("the trace saw these run, and the new base will not have them"))
+	for _, g := range df.RuntimeGaps {
+		fmt.Fprintf(b, "  %s %s\n", p.bad("!"), wrap(g, 72, "    "))
 	}
 }
 
