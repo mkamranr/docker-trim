@@ -111,6 +111,9 @@ func (c *Config) Validate() error {
 	if c.Trace != "" && c.Tracer == TracerNone {
 		return fmt.Errorf("--trace needs a tracing backend: add --tracer proc")
 	}
+	if c.OSV && c.Image == "" {
+		return fmt.Errorf("--osv looks up the packages in a built image: add --image")
+	}
 	if c.PruneUnused && c.Tracer == TracerNone {
 		return fmt.Errorf("--prune-unused needs evidence: add --tracer proc or --tracer ptrace, " +
 			"and --trace with a command that exercises the application")

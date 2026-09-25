@@ -27,12 +27,18 @@ type packageDB struct {
 	dpkgFiles map[string][]byte
 	// wantFiles turns that collection on.
 	wantFiles bool
+	// release is /etc/os-release, which names the distribution and version.
+	release []byte
 }
 
 const (
 	dpkgStatusPath = "/var/lib/dpkg/status"
 	apkDBPath      = "/lib/apk/db/installed"
 	dpkgInfoDir    = "/var/lib/dpkg/info/"
+	osReleasePath  = "/etc/os-release"
+	// Debian and Alpine both ship the real file here and symlink /etc to it,
+	// and a tar stream carries the symlink rather than following it.
+	usrLibOSReleasePath = "/usr/lib/os-release"
 	// maxDBBytes caps how much of a package database is read into memory. A
 	// dpkg status file for a full desktop install is around 3MB.
 	maxDBBytes = 64 << 20
@@ -54,6 +60,11 @@ func (d *packageDB) maybeCapture(p string, r io.Reader) {
 		d.dpkgStatus = readCapped(r)
 	case p == apkDBPath:
 		d.apkDB = readCapped(r)
+	case p == osReleasePath || p == usrLibOSReleasePath:
+		// A later layer's copy wins, which is how the image resolves it.
+		if body := readCapped(r); len(body) > 0 {
+			d.release = body
+		}
 	case strings.HasPrefix(p, "/var/lib/rpm/"):
 		d.sawRPM = true
 	case d.wantFiles && strings.HasPrefix(p, dpkgInfoDir) && strings.HasSuffix(p, ".list"):
@@ -96,6 +107,28 @@ func (d *packageDB) parse() (manager string, pkgs []Package, notes []string) {
 				"inventory is available. Size and layer analysis are unaffected."}
 	}
 	return "none", nil, nil
+}
+
+// osRelease reads the distribution id, pretty name and version out of
+// /etc/os-release.
+func (d *packageDB) osRelease() (id, name, versionID string) {
+	sc := bufio.NewScanner(bytes.NewReader(d.release))
+	for sc.Scan() {
+		key, value, ok := strings.Cut(sc.Text(), "=")
+		if !ok {
+			continue
+		}
+		value = strings.Trim(value, `"'`)
+		switch key {
+		case "ID":
+			id = value
+		case "PRETTY_NAME":
+			name = value
+		case "VERSION_ID":
+			versionID = value
+		}
+	}
+	return id, name, versionID
 }
 
 // parseDpkgStatus reads /var/lib/dpkg/status: RFC822-style stanzas separated by

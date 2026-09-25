@@ -143,7 +143,7 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	fl.StringVar(&f.aggressiveness, "aggressiveness", "likely", "How much to change: safe, likely, aggressive")
 	fl.StringVar(&f.tracer, "tracer", "none", "Runtime tracing backend: none, proc (no privileges), ptrace (exact; ebpf is planned)")
 	fl.DurationVar(&f.traceTimeout, "trace-timeout", 30*time.Second, "How long to let a traced container run")
-	fl.BoolVar(&f.osv, "osv", false, "Look up real CVEs from api.osv.dev (not implemented yet)")
+	fl.BoolVar(&f.osv, "osv", false, "Look up known vulnerabilities at api.osv.dev; sends package names and versions")
 	fl.StringVar(&f.buildContext, "context", "", "Build context directory (default: the Dockerfile's directory)")
 	fl.BoolVar(&f.pruneUnused, "prune-unused", false, "Drop packages a runtime trace never saw used; needs --tracer")
 	fl.StringVar(&f.failOn, "fail-on", "", "Exit 1 when a finding of this severity or worse survives: info, low, medium, high, critical")
@@ -217,9 +217,6 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 			return cfg, fmt.Errorf("--fail-on: %w", err)
 		}
 		cfg.FailOn = sev
-	}
-	if f.osv {
-		return cfg, errors.New("--osv is not implemented yet; see the CHANGELOG for what is planned")
 	}
 	if cfg.File != "" {
 		if _, err := os.Stat(cfg.File); err != nil {

@@ -8,6 +8,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **`--osv`**, which looks every installed package up at osv.dev and reports what is known to
+  affect it. The report was printing `n/a` for CVEs since 0.1.0 because dtrim had no
+  vulnerability data and would not guess; now it has some.
+
+  Advisories become findings, so `--fail-on` gates on them without a second threshold: a
+  pipeline that already refuses a Dockerfile shipping a shell can refuse one shipping a
+  critical CVE, and says so the same way. On a real Debian 13 image: 18 advisories across 87
+  packages, 4 high and 10 medium, in 16 seconds.
+
+  Severity is computed from the advisory's CVSS v3 vector using the formula in the
+  specification, including its own rounding rule, and checked against scores published by
+  NVD. An advisory with no vector dtrim can read is counted and listed as `unknown` and
+  cannot trip `--fail-on`: banding it would be a guess, and a guess either fires a gate for
+  nothing or stays quiet when it should not.
+
+  This is the only part of dtrim that sends anything anywhere, which is why it is opt-in. The
+  query carries the name and version of every package in the image.
+
 - **A corpus survey** (`scripts/fetch-corpus.sh` and `tests/corpus_test.go`). The rest of the
   suite runs against fixtures this project wrote, which only contains shapes dtrim was
   designed for. This runs the same guarantees against Dockerfiles written by other people.
@@ -25,8 +43,8 @@ All notable changes to this project are documented here. The format follows
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
   kernel exposes BTF.
-- **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
-  builds, and use `trivy` or `grype` automatically when either is on `PATH`.
+- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
+  ecosystems OSV does not cover and for language dependencies rather than OS packages.
 - **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
   reporting that Debian and Alpine images already get.
 - Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).

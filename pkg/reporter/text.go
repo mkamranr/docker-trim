@@ -13,6 +13,7 @@ import (
 
 	"github.com/mkamranr/dtrim/pkg/analyzer"
 	"github.com/mkamranr/dtrim/pkg/dtrim"
+	"github.com/mkamranr/dtrim/pkg/security"
 )
 
 // rule is the horizontal separator from the PRD's output specification.
@@ -305,6 +306,9 @@ func writeSummary(b *strings.Builder, p palette, rep *dtrim.Report) {
 	if sec := rep.Security; sec != nil {
 		fmt.Fprintf(b, "Attack Surface      : %s\n", sec.Summary())
 	}
+	if v := rep.Vulnerabilities; v != nil {
+		fmt.Fprintf(b, "Vulnerabilities     : %s\n", vulnSummary(p, v))
+	}
 	fmt.Fprintf(b, "%s\n", p.dim(rule))
 }
 
@@ -373,6 +377,30 @@ func writeWarnings(b *strings.Builder, p palette, rep *dtrim.Report) {
 	for _, n := range unique(all) {
 		fmt.Fprintf(b, "  %s %s\n", p.warn("*"), wrap(n, 72, "    "))
 	}
+}
+
+// vulnSummary renders the CVE line, worst band first so the number that
+// matters is the one read first.
+func vulnSummary(p palette, v *security.VulnerabilityReport) string {
+	if v.Total == 0 {
+		return p.good("none known") + " " + p.dim(fmt.Sprintf("(%d packages checked against OSV)", v.Queried))
+	}
+	var parts []string
+	for _, band := range []string{"critical", "high", "medium", "low", "unknown"} {
+		if n := v.BySeverity[band]; n > 0 {
+			label := fmt.Sprintf("%d %s", n, band)
+			switch band {
+			case "critical", "high":
+				label = p.bad(label)
+			case "medium":
+				label = p.warn(label)
+			default:
+				label = p.dim(label)
+			}
+			parts = append(parts, label)
+		}
+	}
+	return fmt.Sprintf("%d in %d packages  %s", v.Total, v.Queried, strings.Join(parts, ", "))
 }
 
 func baseOf(rep *dtrim.Report, original bool) string {

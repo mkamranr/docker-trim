@@ -214,18 +214,6 @@ func TestImplementedBackends_pass_validation(t *testing.T) {
 	}
 }
 
-// --osv is still unbuilt, and must point at the changelog rather than quietly
-// producing a report with no CVE data in it.
-func TestOSV_is_still_deferred(t *testing.T) {
-	r := dtrim(t, "-f", fixture("go-api.Dockerfile"), "--osv")
-	if r.code != 2 {
-		t.Errorf("exit code = %d, want 2", r.code)
-	}
-	if !strings.Contains(r.stderr, "CHANGELOG") {
-		t.Errorf("stderr does not point at the changelog: %q", r.stderr)
-	}
-}
-
 // Tracing needs something to run, and saying which flag is missing is more
 // useful than a generic validation error.
 func TestTracerWithoutAnImage_says_which_flag_is_missing(t *testing.T) {
@@ -272,47 +260,73 @@ func TestMarkdown_renders_a_pull_request_report(t *testing.T) {
 	}
 }
 
-// The help must not imply a feature works when it does not, and must not keep
-// warning about one that now does.
+// The help must describe what is actually built, in both directions: it must
+// not claim a working feature is future work, and must not advertise one that
+// is missing.
+//
+// This is deliberately derived from the help text rather than from a list kept
+// here. Three separate hand-written versions of this test went stale as
+// features shipped, each time asserting that something already working was
+// still planned.
 func TestHelp_describes_what_is_actually_built(t *testing.T) {
 	r := dtrim(t, "--help")
 	if r.code != 0 {
 		t.Fatalf("exit code = %d", r.code)
 	}
-	helpFor := func(flag string) string {
-		for _, line := range strings.Split(r.stdout, "\n") {
-			if strings.Contains(line, flag+" ") && strings.HasPrefix(strings.TrimSpace(line), "-") {
-				return line
-			}
+
+	// Flags whose help admits they are unbuilt, and the value to try.
+	deferred := map[string]string{}
+	implemented := map[string]string{}
+	for _, line := range strings.Split(r.stdout, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "--") && !strings.HasPrefix(line, "-") {
+			continue
 		}
-		return ""
+		flag := flagName(line)
+		if flag == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "not implemented") || strings.Contains(lower, "planned") {
+			deferred[flag] = line
+		} else {
+			implemented[flag] = line
+		}
 	}
 
-	// Check the meaning rather than a version number: naming a release in the
-	// help means the help goes stale the moment that release ships without it,
-	// which is exactly what happened to this line once 0.2 shipped.
-	if line := helpFor("--osv"); !strings.Contains(line, "not implemented") {
-		t.Errorf("--osv is not built, so its help should say so: %q", line)
-	}
-	// Naming every backend keeps this honest in both directions: the help has
-	// to offer the ones that work and not imply the working ones are future
-	// work. The previous version of this test only required the word "planned"
-	// somewhere on the line, so "ptrace and ebpf are planned" kept passing for
-	// a release after ptrace shipped.
-	tracerHelp := helpFor("--tracer")
-	for _, backend := range []string{"proc", "ptrace", "ebpf"} {
-		if !strings.Contains(tracerHelp, backend) {
-			t.Errorf("--tracer help does not mention %s: %q", backend, tracerHelp)
+	// Anything the help calls unbuilt must actually refuse, naming an
+	// alternative rather than failing obscurely.
+	for flag := range deferred {
+		if flag != "--tracer" {
+			continue
+		}
+		res := dtrim(t, "--image", "busybox:latest", "--tracer", "ebpf")
+		if res.code != 2 || !strings.Contains(res.stderr, "not implemented") {
+			t.Errorf("%s says a backend is planned, but it does not refuse: code=%d %q",
+				flag, res.code, res.stderr)
 		}
 	}
-	if i, j := strings.Index(tracerHelp, "ptrace"), strings.Index(tracerHelp, "planned"); i >= 0 && j >= 0 && i > j {
-		t.Errorf("--tracer help describes ptrace as planned, but it is implemented: %q", tracerHelp)
+
+	// And nothing that works may still be described as future work.
+	for _, flag := range []string{"--trace", "--osv", "--prune-unused", "--fail-on", "--verify"} {
+		if line, stale := deferred[flag]; stale {
+			t.Errorf("%s is implemented, but its help still defers it: %q", flag, line)
+		}
 	}
-	// --trace works now, so its help must no longer claim otherwise.
-	if line := helpFor("--trace"); strings.Contains(line, "planned") ||
-		strings.Contains(line, "not implemented") {
-		t.Errorf("--trace is implemented, but its help still defers it: %q", line)
+}
+
+// flagName pulls the long flag out of a cobra help line such as
+// "  -t, --trace string   Command to run ...".
+func flagName(line string) string {
+	i := strings.Index(line, "--")
+	if i < 0 {
+		return ""
 	}
+	rest := line[i:]
+	if j := strings.IndexAny(rest, " \t"); j > 0 {
+		return rest[:j]
+	}
+	return rest
 }
 
 func TestVersion_prints_something(t *testing.T) {

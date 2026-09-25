@@ -161,8 +161,32 @@ Pair it with `--verify`, which builds the result and starts it.
 
 ### `--osv`
 
-Accepted, and rejected with a pointer to the changelog. It exists so scripts written today
-keep working when real CVE lookup lands. See the changelog.
+Look up every installed package at [osv.dev](https://osv.dev) and report what is known to
+affect it. Needs `--image`, since it reads a built image's package inventory.
+
+```console
+$ dtrim --analyze-only --image myapp:latest --osv
+Vulnerabilities     : 18 in 87 packages  4 high, 10 medium, 1 low, 3 unknown
+```
+
+Advisories become findings, so **`--fail-on` gates on them** without a second threshold:
+
+```sh
+dtrim --analyze-only --image myapp:latest --osv --fail-on critical
+```
+
+Severity comes from the CVSS v3 vector in the advisory, scored with the formula from the
+specification. An advisory carrying no vector dtrim can read is counted and listed as
+`unknown`, and deliberately cannot trip `--fail-on`: banding it would mean guessing, and a
+guess here either fires a gate for nothing or stays quiet when it should not.
+
+**This is the only part of dtrim that sends anything anywhere.** The query carries the name
+and version of every package in the image, which describes that image fairly precisely. It is
+opt-in for that reason. Lookups run six at a time and stop at 600 packages.
+
+Two runs can also differ for reasons that have nothing to do with your Dockerfile, because
+the advisory database moves. That is worth knowing before wiring it into a gate that blocks
+deploys.
 
 ## Recipes
 
@@ -212,7 +236,7 @@ dtrim -f Dockerfile --optimize --verify && mv Dockerfile.trimmed Dockerfile
 | Code | Meaning |
 | ---: | :--- |
 | `0` | Clean run. Without `--fail-on`, this includes a run that reported problems |
-| `1` | `--fail-on` was given and a finding at or above that severity survived |
+| `1` | `--fail-on` was given and a finding at or above that severity survived, including a vulnerability from `--osv` |
 | `2` | dtrim could not do its job: unreadable file, bad flag, failed build |
 
 `1` and `2` are kept apart on purpose. A pipeline needs to tell "your Dockerfile ships a

@@ -38,9 +38,15 @@ type ImageReport struct {
 	WastedBytes int64 `json:"wastedBytes"`
 	// WhiteoutBytes are bytes for files a later layer deleted. Deleting a file
 	// in a later layer does not remove it from the image.
-	WhiteoutBytes  int64     `json:"whiteoutBytes"`
-	PackageManager string    `json:"packageManager"`
-	Packages       []Package `json:"packages,omitempty"`
+	WhiteoutBytes  int64  `json:"whiteoutBytes"`
+	PackageManager string `json:"packageManager"`
+	// OSID and OSVersionID come from /etc/os-release, e.g. "debian" and "12".
+	// Vulnerability lookups need the exact release: a package version is only
+	// vulnerable relative to the distribution that built it.
+	OSID        string    `json:"osId,omitempty"`
+	OSName      string    `json:"osName,omitempty"`
+	OSVersionID string    `json:"osVersionId,omitempty"`
+	Packages    []Package `json:"packages,omitempty"`
 	// SetuidBinaries are files carrying the setuid or setgid bit, each a
 	// standing privilege-escalation primitive.
 	SetuidBinaries []string   `json:"setuidBinaries,omitempty"`
@@ -315,6 +321,7 @@ func inspect(ctx context.Context, ref, source string, img v1.Image, withFiles bo
 	}
 
 	rep.PackageManager, rep.Packages, rep.Notes = pkgFiles.parse()
+	rep.OSID, rep.OSName, rep.OSVersionID = pkgFiles.osRelease()
 
 	sort.Slice(all, func(i, j int) bool { return all[i].Size > all[j].Size })
 	if len(all) > 20 {

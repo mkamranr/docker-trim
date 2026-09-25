@@ -74,9 +74,8 @@ func (s Surface) ByClass() map[string][]Item {
 
 // Assessment compares an image before and after trimming.
 //
-// CVEKnown is false in this release: dtrim reports what it removed, not a
-// vulnerability count it did not measure. Real CVE data arrives in 0.2 behind
-// --osv and the trivy/grype adapters. See the CHANGELOG.
+// CVEKnown is false unless --osv actually looked the packages up. dtrim reports
+// what it removed, never a vulnerability count it did not measure.
 type Assessment struct {
 	Original Surface  `json:"original"`
 	Trimmed  *Surface `json:"trimmed,omitempty"`
@@ -214,8 +213,8 @@ func Compare(original Surface, trimmed *Surface) Assessment {
 		a.RemovedPackages = n
 	}
 	a.Notes = append(a.Notes,
-		"CVE counts are not reported in this release. dtrim does not print a vulnerability "+
-			"number it has not measured. Real CVE data is not wired up yet.")
+		"CVE counts are not reported unless --osv is given: dtrim does not print a "+
+			"vulnerability number it has not measured.")
 	return a
 }
 

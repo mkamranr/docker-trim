@@ -27,7 +27,9 @@ type Report struct {
 	// Trace is present when a tracing backend actually ran.
 	Trace    *TraceReport         `json:"trace,omitempty"`
 	Security *security.Assessment `json:"security,omitempty"`
-	Result   OptimizationResult   `json:"optimization"`
+	// Vulnerabilities is present only when --osv actually queried OSV.
+	Vulnerabilities *security.VulnerabilityReport `json:"vulnerabilities,omitempty"`
+	Result          OptimizationResult            `json:"optimization"`
 	// Verification is present only when --verify actually built both images,
 	// which is the only way a size in this report is a measurement.
 	Verification *Verification `json:"verification,omitempty"`
@@ -138,6 +140,11 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 
 		if cfg.Tracer != TracerNone {
 			if err := runTrace(ctx, cfg, rep); err != nil {
+				return nil, err
+			}
+		}
+		if cfg.OSV {
+			if err := runOSV(ctx, cfg, rep); err != nil {
 				return nil, err
 			}
 		}

@@ -146,5 +146,7 @@ case where dtrim otherwise says "I left the structure alone". Pair it with `--ve
   your error handler needs.
 - **It does not rewrite an already multi-stage file.**
 - **It does not touch the network**, except when you pass `--image` with a reference the local
-  daemon does not have, or `--verify`, which builds.
-- **It does not print a CVE count.** Until it can measure one, the field says `n/a`.
+  daemon does not have, `--verify`, which builds, or `--osv`, which sends the package list to
+  osv.dev.
+- **It does not print a CVE count it did not measure.** Without `--osv` the field says `n/a`
+  rather than an estimate.

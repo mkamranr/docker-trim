@@ -109,6 +109,7 @@ where the binary lands.
 | `curl`, `wget`, `nc`, `git`, `gcc`, `sudo` in the final image | Reports each one and what it gives an attacker; the runtime stage leaves them behind |
 | A credential-shaped `ENV` or `ARG` | Reports it: every layer keeps it, so `docker history` reveals it |
 | A running container (`--tracer`) | Runs it and records what it actually touches, then attributes those files back to the packages that installed them, so you can see what was never used. `proc` samples `/proc` and needs no privileges; `ptrace` observes every syscall and misses nothing |
+| A built image, with `--osv` | Looks every installed package up at osv.dev and reports what is known to affect it, scored from the advisory's own CVSS vector. Those become findings, so `--fail-on critical` refuses a build over them |
 | A built image | Streams its layers and reports where the bytes went: caches, docs, locales, bytecode, files written then overwritten, files deleted but still shipped |
 
 When a trace is available, it also checks its own work. A Go service that shells out, rewritten
@@ -198,7 +199,7 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--trace` | `-t` | | Command to run inside the container while tracing |
 | `--tracer` | | `none` | Tracing backend: `proc` (no privileges) or `ptrace` (exact) |
 | `--trace-timeout` | | `30s` | How long to let a traced container run |
-| `--osv` | | `false` | Real CVE lookup — not implemented yet |
+| `--osv` | | `false` | Look up known vulnerabilities at osv.dev; needs `--image` |
 
 Exit codes: `0` clean, `1` when `--fail-on` was given and something met the threshold, `2`
 when dtrim itself could not run. Full details in [`docs/usage.md`](docs/usage.md).
