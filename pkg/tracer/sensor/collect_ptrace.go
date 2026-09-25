@@ -210,15 +210,15 @@ func runPtrace(argv []string, c *collector) (int, error) {
 		}
 
 		deliver := 0
-		switch sig := ws.StopSignal(); {
-		case sig == syscall.SIGTRAP|0x80:
+		switch sig := ws.StopSignal(); sig {
+		case syscall.SIGTRAP | 0x80:
 			if c.onSyscallStop(wpid, t) {
 				infoOK++
 			} else {
 				infoFailed++
 			}
 
-		case sig == syscall.SIGTRAP:
+		case syscall.SIGTRAP:
 			switch event := (int(ws) >> 16) & 0xff; event {
 			case syscall.PTRACE_EVENT_FORK, syscall.PTRACE_EVENT_VFORK, syscall.PTRACE_EVENT_CLONE:
 				if child, err := syscall.PtraceGetEventMsg(wpid); err == nil {
@@ -240,7 +240,7 @@ func runPtrace(argv []string, c *collector) (int, error) {
 				c.recordIO(wpid)
 			}
 
-		case sig == syscall.SIGSTOP:
+		case syscall.SIGSTOP:
 			// A new child's initial stop. Swallowing it is correct: delivering
 			// it would suspend the process we are trying to observe.
 

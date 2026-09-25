@@ -185,19 +185,31 @@ func TestExitCode_is_two_on_error(t *testing.T) {
 	}
 }
 
-// A backend that has not shipped must say so and name the one that has, rather
-// than failing with something generic or silently doing nothing.
-func TestUnimplementedBackends_name_the_one_that_works(t *testing.T) {
-	for _, backend := range []string{"ptrace", "ebpf"} {
-		r := dtrim(t, "--image", "busybox:latest", "--tracer", backend)
-		if r.code != 2 {
-			t.Errorf("--tracer %s: exit code = %d, want 2", backend, r.code)
-		}
-		if !strings.Contains(r.stderr, "not implemented") {
-			t.Errorf("--tracer %s: stderr = %q", backend, r.stderr)
-		}
-		if !strings.Contains(r.stderr, "proc") {
-			t.Errorf("--tracer %s does not point at the backend that works: %q", backend, r.stderr)
+// A backend that has not shipped must say so and name one that has, rather than
+// failing with something generic or silently doing nothing. ptrace shipped, so
+// only ebpf is left; validation happens before any image is touched, which is
+// why this needs no Docker.
+func TestUnimplementedBackends_name_one_that_works(t *testing.T) {
+	r := dtrim(t, "--image", "busybox:latest", "--tracer", "ebpf")
+	if r.code != 2 {
+		t.Errorf("--tracer ebpf: exit code = %d, want 2", r.code)
+	}
+	if !strings.Contains(r.stderr, "not implemented") {
+		t.Errorf("--tracer ebpf: stderr = %q", r.stderr)
+	}
+	if !strings.Contains(r.stderr, "proc") {
+		t.Errorf("--tracer ebpf does not point at a backend that works: %q", r.stderr)
+	}
+}
+
+// Both implemented backends have to be accepted by flag validation, which runs
+// before anything touches Docker.
+func TestImplementedBackends_pass_validation(t *testing.T) {
+	for _, backend := range []string{"proc", "ptrace"} {
+		r := dtrim(t, "--image", "dtrim-no-such-image:v0", "--tracer", backend)
+		// It should fail on the missing image, not on the backend name.
+		if strings.Contains(r.stderr, "not implemented") {
+			t.Errorf("--tracer %s was rejected as unimplemented: %q", backend, r.stderr)
 		}
 	}
 }

@@ -20,11 +20,15 @@ golden:
 lint:
 	@test -z "$$(gofmt -l . | tee /dev/stderr)" || (echo "gofmt: files need formatting" >&2; exit 1)
 	go vet ./...
-	@command -v golangci-lint >/dev/null && golangci-lint run --build-tags integration || echo "golangci-lint not installed, skipped"
-	@# The ptrace collector only builds on linux, so vet it there explicitly:
-	@# on a developer's machine it is otherwise never compiled.
+	@# The ptrace collector only builds on linux, so check it there explicitly:
+	@# on a developer's machine it is otherwise never compiled, and CI is a slow
+	@# place to discover that.
 	GOOS=linux GOARCH=amd64 go vet ./...
 	GOOS=linux GOARCH=arm64 go vet ./...
+	@if command -v golangci-lint >/dev/null; then \
+		golangci-lint run --build-tags integration && \
+		GOOS=linux GOARCH=amd64 golangci-lint run --build-tags integration; \
+	else echo "golangci-lint not installed, skipped"; fi
 
 fmt:
 	gofmt -w .
