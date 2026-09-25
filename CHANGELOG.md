@@ -16,6 +16,19 @@ All notable changes to this project are documented here. The format follows
   reporting that Debian and Alpine images already get.
 - Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
 
+## [0.5.1] - 2026-09-25
+
+### Fixed
+
+- **A release can be re-run.** goreleaser refused to overwrite assets it had already
+  uploaded, so re-running the workflow for an existing tag failed on every one with
+  `already_exists`. That is exactly the case that needs to work: the first attempt at 0.5.0
+  ran without the Homebrew tap token configured and skipped the formula, and the obvious
+  remedy — set the secret, run it again — was impossible.
+
+  Note that the workflow builds from the tag, so a fix to the release pipeline only takes
+  effect from the next tag onwards. This is that tag.
+
 ## [0.5.0] - 2026-09-25
 
 ### Added
@@ -269,7 +282,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.1
 [0.5.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.0
 [0.4.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.4.0
 [0.3.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.1
