@@ -7,10 +7,18 @@
                                                                                     ▼
   Image ───────► layer inspector ──► package inventory ──► attack surface ──►    report
                  (pure Go, streams   (dpkg / apk)          (embedded ruleset)   (text/JSON/
-                  every layer tar)                                               markdown)
+                  every layer tar)         │                                     markdown)
+                                           ▼                                        │
+                 --tracer proc ──► run it and sample /proc ──► what went unused ─────┤
+                                  (no capabilities needed)                          │
                                                                                     │
                                           --verify ──► build both, measure, start ──┘
 ```
+
+Usage attribution is the one place two halves of the pipeline meet: the trace produces
+paths, the package inventory says who owns them, and `analyzer.AttributeUsage` joins the two.
+That is why `--tracer` switches image inspection to `InspectImageWithOwnership`, which reads
+the per-package file lists that a plain size report does not need.
 
 ## Packages
 
@@ -22,7 +30,7 @@
 | `pkg/synthesizer` | Ecosystem detection, base mapping, the multi-stage transform, the emitter. |
 | `pkg/security` | Attack-surface scoring from an embedded ruleset. |
 | `pkg/reporter` | Terminal output, JSON, unified diff, Markdown. |
-| `pkg/tracer` | Docker engine operations: build, measure, start. Runtime tracing in 0.2. |
+| `pkg/tracer` | Docker engine operations: build, measure, start, and the `/proc` sampler that observes a running container. |
 
 The dependency graph runs one way: `analyzer` depends on nothing of ours, `synthesizer`
 depends on `analyzer`, and `dtrim` depends on all of them.

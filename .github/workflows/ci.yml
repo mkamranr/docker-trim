@@ -86,6 +86,9 @@ jobs:
       - name: reduction bands
         run: DTRIM_INTEGRATION=1 go test -tags integration -timeout 40m ./tests/... -v
       - name: dtrim passes its own analysis
+        # A real gate, not a smoke test: if dtrim would fail this Dockerfile in
+        # someone else's pipeline, it has to fail it here first. This is what
+        # caught DT010 flagging the distroless nonroot tag.
         run: |
           go build -o dtrim .
-          ./dtrim --analyze-only -f Dockerfile
+          ./dtrim --analyze-only -f Dockerfile --fail-on high

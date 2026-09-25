@@ -162,7 +162,7 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--trace` | `-t` | | Command to run inside the container while tracing |
 | `--tracer` | | `none` | Tracing backend: `proc` (`ptrace` and `ebpf` planned) |
 | `--trace-timeout` | | `30s` | How long to let a traced container run |
-| `--osv` | | `false` | Real CVE lookup — planned for 0.2 |
+| `--osv` | | `false` | Real CVE lookup — not implemented yet |
 
 Exit codes: `0` clean, `1` when `--fail-on` was given and something met the threshold, `2`
 when dtrim itself could not run. Full details in [`docs/usage.md`](docs/usage.md).
@@ -183,7 +183,10 @@ dtrim --analyze-only --fail-on high        # also refuse a shell, or running as 
                                                                                     ▼
   Image ───────► layer inspector ──► package inventory ──► attack surface ──►    report
                  (pure Go, streams   (dpkg / apk)          (embedded ruleset)   (text/JSON/
-                  every layer tar)                                               markdown)
+                  every layer tar)         │                                     markdown)
+                                           ▼                                        │
+                 --tracer proc ──► run it and sample /proc ──► what went unused ─────┤
+                                  (no capabilities needed)                          │
                                                                                     │
                                           --verify ──► build both, measure, start ──┘
 ```

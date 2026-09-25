@@ -280,3 +280,39 @@ func TestLint_sorts_the_worst_findings_first(t *testing.T) {
 		}
 	}
 }
+
+// Google's distroless and Chainguard's images set a non-root user in the image
+// itself and say so in the tag. Flagging them would mean flagging the exact
+// arrangement dtrim recommends, which is how a tool teaches people to ignore it.
+func TestDT010_accepts_a_base_image_that_already_drops_privileges(t *testing.T) {
+	quiet := []string{
+		"FROM gcr.io/distroless/static-debian12:nonroot\nCOPY app /app\nCMD [\"/app\"]\n",
+		"FROM gcr.io/distroless/nodejs20-debian12:nonroot\nCMD [\"/app/s.js\"]\n",
+		"FROM cgr.dev/chainguard/static:latest-nonroot\nCOPY app /app\nCMD [\"/app\"]\n",
+	}
+	for _, src := range quiet {
+		if got := ids(Lint(parseString(t, src)))["DT010"]; got != 0 {
+			t.Errorf("DT010 fired on a base that already runs as non-root:\n%s", src)
+		}
+	}
+
+	loud := []string{
+		// The same image family without the nonroot tag runs as root.
+		"FROM gcr.io/distroless/static-debian12:latest\nCOPY app /app\nCMD [\"/app\"]\n",
+		"FROM debian:12\nCMD [\"/app\"]\n",
+	}
+	for _, src := range loud {
+		if got := ids(Lint(parseString(t, src)))["DT010"]; got == 0 {
+			t.Errorf("DT010 stayed quiet for an image that does run as root:\n%s", src)
+		}
+	}
+}
+
+// An explicit USER root is a deliberate escalation and must still be reported,
+// even when the base image would otherwise have dropped privileges.
+func TestDT010_reports_an_explicit_user_root_over_a_nonroot_base(t *testing.T) {
+	src := "FROM gcr.io/distroless/static-debian12:nonroot\nUSER root\nCMD [\"/app\"]\n"
+	if got := ids(Lint(parseString(t, src)))["DT010"]; got == 0 {
+		t.Error("DT010 did not fire for an explicit USER root")
+	}
+}

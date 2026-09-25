@@ -689,18 +689,54 @@ func (r ruleRunsAsRoot) Check(a *Analysis) []Finding {
 	if final == nil {
 		return nil
 	}
-	line := 0
+	var (
+		line       int
+		forcedRoot bool
+		userLine   int
+	)
 	for _, ins := range final.Instructions {
-		if ins.Keyword == "USER" && len(ins.Args) > 0 && ins.Args[0] != "root" && ins.Args[0] != "0" {
+		if ins.Keyword == "USER" && len(ins.Args) > 0 {
+			if ins.Args[0] == "root" || ins.Args[0] == "0" {
+				// An explicit USER root is a deliberate escalation, and it
+				// overrides whatever the base image set.
+				forcedRoot, userLine = true, ins.Line
+				continue
+			}
 			return nil
 		}
 		if ins.Keyword == "ENTRYPOINT" || ins.Keyword == "CMD" {
 			line = ins.Line
 		}
 	}
+	if forcedRoot {
+		return []Finding{finding(r, userLine,
+			"`USER root` puts the process back to uid 0, overriding whatever the base image "+
+				"set. A container breakout, or any bind mount, then has root's reach.", false, 0)}
+	}
+	// A base image can drop privileges on the stage's behalf, and the images
+	// that do say so in the tag. Flagging those would mean flagging the exact
+	// practice dtrim recommends everywhere else.
+	if baseRunsAsNonRoot(final.BaseImage) {
+		return nil
+	}
 	return []Finding{finding(r, line,
 		"The final stage never drops privileges, so the process runs as uid 0. A container "+
 			"breakout, or any bind mount, then has root's reach.", true, 0)}
+}
+
+// baseRunsAsNonRoot reports whether a base image already runs as a non-root
+// user.
+//
+// This reads the tag rather than the image configuration, because linting a
+// Dockerfile must not require pulling every base image it mentions. The
+// `nonroot` tag is a convention rather than a guarantee, but it is one both
+// Google's distroless images and Chainguard's follow deliberately, and honouring
+// it is what stops dtrim from flagging the arrangement it tells everyone to
+// adopt. A base that drops privileges without saying so in its tag still gets
+// the finding, which is the safe direction to be wrong in.
+func baseRunsAsNonRoot(base string) bool {
+	_, tag := splitTag(base)
+	return tag == "nonroot" || strings.HasSuffix(tag, "-nonroot")
 }
 
 // -----------------------------------------------------------------------------

@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Planned
+
+- **The `ptrace` and `eBPF` tracing backends**, for exact `openat` data on hosts that can
+  support them. The `proc` sampler races with short-lived processes; `ptrace` does not.
+- **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
+  builds, and use `trivy` or `grype` automatically when either is on `PATH`.
+- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
+  reporting that Debian and Alpine images already get.
+- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.2.0] - 2026-09-25
+
 ### Added
 
 - **Runtime tracing** (`--tracer proc`, `--trace`, `--trace-timeout`). dtrim builds an
@@ -42,15 +54,28 @@ All notable changes to this project are documented here. The format follows
   what lets a pipeline tell a bad Dockerfile from a broken tool. Nothing changes for a run
   without `--fail-on`.
 
-### Planned for 0.2
+### Fixed
 
-- **The `ptrace` and `eBPF` tracing backends**, for exact `openat` data on hosts that can
-  support them. The `proc` sampler races with short-lived processes; `ptrace` does not.
-- **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
-  builds, and use `trivy` or `grype` automatically when either is on `PATH`.
-- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
-  reporting that Debian and Alpine images already get.
-- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+- **DT010 no longer flags a base image that already drops privileges.** An image whose tag
+  says `nonroot`, as Google's distroless and Chainguard's images do, sets a non-root user in
+  the image itself, so a Dockerfile using one needs no `USER` line. dtrim was reporting that
+  as "container runs as root" at high severity, which meant flagging the exact arrangement it
+  recommends everywhere else, and meant dtrim's own Dockerfile failed its own `--fail-on
+  high` gate. An explicit `USER root` is still reported, since that overrides whatever the
+  base set.
+
+### Known limitations
+
+- **A trace is evidence, not proof.** Sampling `/proc` races with short-lived processes: the
+  same 40ms command traced six times caught between three and ten dynamically loaded Python
+  modules, and a shorter sampling interval does not help. What is reliable is anything mapped
+  for the life of the process, which is the interpreter, everything it links against, and
+  every long-lived worker. dtrim reports how long the traced command ran and warns when that
+  was under a second, and it never removes a package on the strength of a trace.
+- **Only the `proc` backend exists.** `--tracer ptrace` and `--tracer ebpf` are accepted and
+  rejected, naming the backend that works.
+- **CVE counts are still unavailable.** `--fail-on` gates on dtrim's own findings, not on
+  vulnerabilities, because dtrim has no vulnerability data to gate on yet.
 
 ## [0.1.0] - 2026-09-22
 
@@ -111,5 +136,6 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.2.0
 [0.1.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.1.0

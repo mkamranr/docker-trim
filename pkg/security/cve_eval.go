@@ -215,7 +215,7 @@ func Compare(original Surface, trimmed *Surface) Assessment {
 	}
 	a.Notes = append(a.Notes,
 		"CVE counts are not reported in this release. dtrim does not print a vulnerability "+
-			"number it has not measured; --osv and the trivy/grype adapters land in 0.2.")
+			"number it has not measured. Real CVE data is not wired up yet.")
 	return a
 }
 

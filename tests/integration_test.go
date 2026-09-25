@@ -276,14 +276,18 @@ func TestHelp_describes_what_is_actually_built(t *testing.T) {
 		return ""
 	}
 
-	if line := helpFor("--osv"); !strings.Contains(line, "0.2") {
+	// Check the meaning rather than a version number: naming a release in the
+	// help means the help goes stale the moment that release ships without it,
+	// which is exactly what happened to this line once 0.2 shipped.
+	if line := helpFor("--osv"); !strings.Contains(line, "not implemented") {
 		t.Errorf("--osv is not built, so its help should say so: %q", line)
 	}
 	if line := helpFor("--tracer"); !strings.Contains(line, "planned") {
 		t.Errorf("--tracer help should name which backends are still planned: %q", line)
 	}
 	// --trace works now, so its help must no longer claim otherwise.
-	if line := helpFor("--trace"); strings.Contains(line, "0.2") || strings.Contains(line, "planned") {
+	if line := helpFor("--trace"); strings.Contains(line, "planned") ||
+		strings.Contains(line, "not implemented") {
 		t.Errorf("--trace is implemented, but its help still defers it: %q", line)
 	}
 }
