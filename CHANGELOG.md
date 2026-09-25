@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Planned
+
+- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
+  kernel exposes BTF.
+- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
+  ecosystems OSV does not cover and for language dependencies rather than OS packages.
+- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
+  reporting that Debian and Alpine images already get.
+- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.5.0] - 2026-09-25
+
 ### Added
 
 - **`--osv`**, which looks every installed package up at osv.dev and reports what is known to
@@ -39,15 +51,19 @@ All notable changes to this project are documented here. The format follows
   and only package a binary CI produced, and 9% would land on the base they started from. The
   README now states this, along with the corpus's own bias.
 
-### Planned
+### Known limitations
 
-- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
-  kernel exposes BTF.
-- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
-  ecosystems OSV does not cover and for language dependencies rather than OS packages.
-- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
-  reporting that Debian and Alpine images already get.
-- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+- **`--osv` covers operating-system packages, not language dependencies.** The packages in
+  `requirements.txt` or `package.json` are not looked up, so a clean report is not a clean
+  image. `trivy` and `grype` adapters are planned for that.
+- **Debian, Ubuntu and Alpine only.** Any other distribution is refused rather than queried,
+  because a lookup in the wrong ecosystem returns nothing and looks exactly like a clean
+  image.
+- **It reports the current image, not a before and after.** `OriginalCVEs` is populated;
+  `RemainingCVEs` needs the trimmed image built and inspected, which is a `--verify`
+  composition that is not wired up yet.
+- **The answer moves.** The advisory database changes daily, so two runs of the same image
+  can differ for reasons that have nothing to do with the Dockerfile.
 
 ## [0.4.0] - 2026-09-25
 
@@ -253,7 +269,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.0
 [0.4.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.4.0
 [0.3.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.1
 [0.3.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.0
