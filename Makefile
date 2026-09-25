@@ -21,6 +21,10 @@ lint:
 	@test -z "$$(gofmt -l . | tee /dev/stderr)" || (echo "gofmt: files need formatting" >&2; exit 1)
 	go vet ./...
 	@command -v golangci-lint >/dev/null && golangci-lint run --build-tags integration || echo "golangci-lint not installed, skipped"
+	@# The ptrace collector only builds on linux, so vet it there explicitly:
+	@# on a developer's machine it is otherwise never compiled.
+	GOOS=linux GOARCH=amd64 go vet ./...
+	GOOS=linux GOARCH=arm64 go vet ./...
 
 fmt:
 	gofmt -w .

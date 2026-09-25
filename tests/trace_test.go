@@ -222,3 +222,126 @@ func TestTrace_attributes_unused_packages(t *testing.T) {
 		t.Error("no removable bytes reported despite unused packages")
 	}
 }
+
+// The reason ptrace exists: it stops at every syscall, so the same command
+// traced twice produces the same answer. The sampler does not, and cannot.
+func TestPtraceTracer_is_deterministic_where_sampling_is_not(t *testing.T) {
+	ctx := requireDocker(t)
+	const tag = "dtrim-trace-it:determinism"
+	// Short enough that the sampler races with it, which is the point.
+	buildImage(t, tag, "FROM python:3.12-slim\nCMD [\"python\",\"-c\",\"import json,ssl,sqlite3;print('ok')\"]\n")
+
+	tr, err := tracer.New(tracer.BackendPtrace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := tracer.DefaultOptions()
+	opts.Image = tag
+	opts.Timeout = 60 * time.Second
+
+	const runs = 3
+	var counts []int
+	for i := 0; i < runs; i++ {
+		res, err := tr.Trace(ctx, opts)
+		if err != nil {
+			t.Fatalf("run %d: %v", i, err)
+		}
+		if res.ExitCode != 0 {
+			t.Fatalf("run %d: the traced command exited %d", i, res.ExitCode)
+		}
+		counts = append(counts, len(res.Manifest.AccessedFiles))
+
+		// Every module is opened, whether or not it stays resident, so all of
+		// them are observed every time. The sampler catches these only when the
+		// timing happens to work out.
+		joined := strings.Join(res.Manifest.AccessedFiles, "\n")
+		for _, want := range []string{"_ssl", "_sqlite3", "python3.12"} {
+			if !strings.Contains(joined, want) {
+				t.Errorf("run %d missed %q, which ptrace cannot legitimately miss", i, want)
+			}
+		}
+	}
+	for i := 1; i < runs; i++ {
+		if counts[i] != counts[0] {
+			t.Errorf("file counts differ across runs: %v. ptrace observes every syscall, "+
+				"so the same command has to produce the same answer", counts)
+			break
+		}
+	}
+}
+
+// ptrace records a path only once the syscall has returned successfully, so a
+// file the program looked for and did not find is never counted as used.
+func TestPtraceTracer_ignores_files_that_were_not_there(t *testing.T) {
+	ctx := requireDocker(t)
+	const tag = "dtrim-trace-it:missing"
+	buildImage(t, tag, "FROM busybox:1.37\n"+
+		"CMD [\"sh\",\"-c\",\"cat /definitely/not/here 2>/dev/null; cat /etc/hostname >/dev/null\"]\n")
+
+	tr, _ := tracer.New(tracer.BackendPtrace)
+	opts := tracer.DefaultOptions()
+	opts.Image = tag
+	opts.Timeout = 60 * time.Second
+
+	res, err := tr.Trace(ctx, opts)
+	if err != nil {
+		t.Fatalf("tracing failed: %v", err)
+	}
+	joined := strings.Join(res.Manifest.AccessedFiles, "\n")
+	if strings.Contains(joined, "/definitely/not/here") {
+		t.Error("a failed open was recorded as a used file")
+	}
+	if !strings.Contains(joined, "/etc/hostname") {
+		t.Errorf("the successful open was not recorded:\n%s", joined)
+	}
+}
+
+// A shell that forks is the normal shape of a --trace workload, and getting the
+// syscall entry and exit pairing wrong silently drops the child's file access.
+func TestPtraceTracer_follows_forked_children(t *testing.T) {
+	ctx := requireDocker(t)
+	const tag = "dtrim-trace-it:fork"
+	buildImage(t, tag, "FROM python:3.12-slim\n"+
+		"CMD [\"/bin/sh\",\"-c\",\"python -c 'import sqlite3'\"]\n")
+
+	tr, _ := tracer.New(tracer.BackendPtrace)
+	opts := tracer.DefaultOptions()
+	opts.Image = tag
+	opts.Timeout = 60 * time.Second
+
+	res, err := tr.Trace(ctx, opts)
+	if err != nil {
+		t.Fatalf("tracing failed: %v", err)
+	}
+	if res.Processes < 2 {
+		t.Errorf("processes = %d, want the shell and the python it spawned", res.Processes)
+	}
+	joined := strings.Join(res.Manifest.AccessedFiles, "\n")
+	// These belong to the child. Seeing the shell but not its child is the
+	// signature of broken entry/exit pairing after a fork.
+	for _, want := range []string{"_sqlite3", "libsqlite3"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("the forked child's use of %q was not observed:\n%s", want, joined)
+		}
+	}
+}
+
+// Whatever the backend, the wrapper must not change what the container does.
+func TestPtraceTracer_is_transparent_to_the_container(t *testing.T) {
+	ctx := requireDocker(t)
+	const tag = "dtrim-trace-it:ptexit"
+	buildImage(t, tag, "FROM busybox:1.37\nCMD [\"sh\",\"-c\",\"echo hello; exit 9\"]\n")
+
+	tr, _ := tracer.New(tracer.BackendPtrace)
+	opts := tracer.DefaultOptions()
+	opts.Image = tag
+	opts.Timeout = 60 * time.Second
+
+	res, err := tr.Trace(ctx, opts)
+	if err != nil {
+		t.Fatalf("tracing failed: %v", err)
+	}
+	if res.ExitCode != 9 {
+		t.Errorf("exit code = %d, want the container's own 9", res.ExitCode)
+	}
+}

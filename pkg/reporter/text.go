@@ -182,9 +182,14 @@ func writeTrace(b *strings.Builder, p palette, rep *dtrim.Report, opt Options) {
 	u := t.Usage
 
 	fmt.Fprintf(b, "\n%s\n", p.bold("Runtime trace"))
-	fmt.Fprintf(b, "  Observed            : %s across %d %s, %d %s\n",
-		t.TraceSummary(), t.Processes, plural("process", t.Processes),
-		t.Samples, plural("sample", t.Samples))
+	how := fmt.Sprintf("%d %s", t.Samples, plural("sample", t.Samples))
+	if t.Samples == 0 {
+		// ptrace stops at every syscall rather than sampling, so a sample
+		// count of zero is the design and not a failure.
+		how = "every syscall"
+	}
+	fmt.Fprintf(b, "  Observed            : %s across %d %s, %s\n",
+		t.TraceSummary(), t.Processes, plural("process", t.Processes), how)
 
 	if total := len(u.Used) + len(u.Unused) + len(u.Essential); total > 0 {
 		fmt.Fprintf(b, "  Packages exercised  : %d of %d\n", len(u.Used), total)

@@ -17,8 +17,9 @@ const (
 	// BackendProc samples /proc from inside the container. It needs no added
 	// capabilities, which is what makes it work everywhere.
 	BackendProc Backend = "proc"
-	// BackendPtrace decodes execve and openat exactly. Planned; needs
-	// CAP_SYS_PTRACE and an unconfined seccomp profile.
+	// BackendPtrace decodes execve and openat exactly, missing nothing. Needs
+	// CAP_SYS_PTRACE and an unconfined seccomp profile, and slows the traced
+	// program down.
 	BackendPtrace Backend = "ptrace"
 	// BackendEBPF attaches kernel probes. Planned; needs a privileged sidecar
 	// and a kernel exposing BTF.
@@ -90,8 +91,7 @@ func New(b Backend) (Tracer, error) {
 	case BackendProc:
 		return procTracer{}, nil
 	case BackendPtrace:
-		return nil, fmt.Errorf("the ptrace backend is not implemented yet; use --tracer proc " +
-			"(see docs/tracing.md)")
+		return ptraceTracer{}, nil
 	case BackendEBPF:
 		return nil, fmt.Errorf("the eBPF backend is not implemented yet, and needs a kernel " +
 			"exposing /sys/kernel/btf/vmlinux; use --tracer proc (see docs/tracing.md)")

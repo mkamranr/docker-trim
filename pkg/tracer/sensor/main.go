@@ -27,7 +27,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -61,6 +60,7 @@ type manifest struct {
 }
 
 func main() {
+	mode := flag.String("mode", "proc", "how to observe: proc or ptrace")
 	interval := flag.Duration("interval", 50*time.Millisecond, "how often to sample /proc")
 	settle := flag.Duration("settle", 0, "keep tracing this long after the command exits")
 	flag.Parse()
@@ -72,46 +72,44 @@ func main() {
 	}
 
 	c := newCollector()
+	started := time.Now()
 
-	cmd := exec.Command(argv[0], argv[1:]...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "dtrim-sensor: cannot start %s: %v\n", argv[0], err)
-		c.emit(0)
-		os.Exit(127)
+	var (
+		code int
+		err  error
+	)
+	switch *mode {
+	case "proc":
+		code, err = runProc(argv, c, *interval, *settle)
+	case "ptrace":
+		code, err = runPtrace(argv, c)
+	default:
+		fmt.Fprintf(os.Stderr, "dtrim-sensor: unknown mode %q\n", *mode)
+		os.Exit(2)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dtrim-sensor: %v\n", err)
 	}
 
-	// A container is normally stopped rather than allowed to finish, so the
-	// manifest has to survive SIGTERM. Forward it and keep going.
+	// The manifest is emitted even when the run failed: a partial trace of a
+	// command that died still says which libraries loaded before it did.
+	c.emit(time.Since(started))
+	os.Exit(code)
+}
+
+// forwardSignals relays termination to the child, so a `docker stop` reaches
+// the real process rather than only the sensor. A container is normally stopped
+// rather than allowed to finish, so the manifest has to survive SIGTERM.
+func forwardSignals(proc *os.Process) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		for s := range signals {
-			if cmd.Process != nil {
-				_ = cmd.Process.Signal(s)
+			if proc != nil {
+				_ = proc.Signal(s)
 			}
 		}
 	}()
-
-	done := make(chan struct{})
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.sampleUntil(done, *interval)
-	}()
-
-	started := time.Now()
-	err := cmd.Wait()
-	elapsed := time.Since(started)
-	if *settle > 0 {
-		time.Sleep(*settle)
-	}
-	close(done)
-	wg.Wait()
-
-	c.emit(elapsed)
-	os.Exit(exitCode(err))
 }
 
 func exitCode(err error) int {
@@ -146,105 +144,6 @@ func newCollector() *collector {
 		readBytes: map[int]int64{},
 		self:      os.Getpid(),
 	}
-}
-
-func (c *collector) sampleUntil(done <-chan struct{}, every time.Duration) {
-	// Sample immediately: a command that exits in milliseconds still executed,
-	// and waiting for the first tick would miss it entirely.
-	c.sample()
-	t := time.NewTicker(every)
-	defer t.Stop()
-	for {
-		select {
-		case <-done:
-			c.sample() // one last look before the process table empties
-			return
-		case <-t.C:
-			c.sample()
-		}
-	}
-}
-
-func (c *collector) sample() {
-	entries, err := os.ReadDir("/proc")
-	if err != nil {
-		return
-	}
-	c.mu.Lock()
-	c.samples++
-	c.mu.Unlock()
-
-	for _, e := range entries {
-		pid, err := strconv.Atoi(e.Name())
-		if err != nil || pid == c.self {
-			continue
-		}
-		c.scanProcess(pid)
-	}
-}
-
-func (c *collector) scanProcess(pid int) {
-	dir := "/proc/" + strconv.Itoa(pid)
-
-	// The executable. This is the single most useful signal: it names every
-	// program that ran, which is what maps back to packages.
-	if exe, err := os.Readlink(dir + "/exe"); err == nil {
-		c.addBinary(exe)
-	}
-
-	// Mapped files: shared libraries, and anything mmapped such as a locale
-	// archive or a JIT cache.
-	if maps, err := os.ReadFile(dir + "/maps"); err == nil {
-		for _, line := range strings.Split(string(maps), "\n") {
-			if p := mappedPath(line); p != "" {
-				c.addMapped(p)
-			}
-		}
-	}
-
-	// Open descriptors: config files, certificates, sockets. This is the part
-	// sampling can miss, because a file opened and closed between two samples
-	// never appears here.
-	if fds, err := os.ReadDir(dir + "/fd"); err == nil {
-		for _, fd := range fds {
-			if target, err := os.Readlink(dir + "/fd/" + fd.Name()); err == nil {
-				c.addFile(target)
-			}
-		}
-	}
-
-	if io, err := os.ReadFile(dir + "/io"); err == nil {
-		c.addReadBytes(pid, parseRchar(string(io)))
-	}
-
-	c.mu.Lock()
-	c.pids[pid] = true
-	c.mu.Unlock()
-}
-
-// mappedPath extracts the file behind a line of /proc/pid/maps. Anonymous
-// mappings and pseudo-entries such as [heap] have no file.
-func mappedPath(line string) string {
-	fields := strings.Fields(line)
-	if len(fields) < 6 {
-		return ""
-	}
-	p := strings.Join(fields[5:], " ")
-	if !strings.HasPrefix(p, "/") || strings.HasSuffix(p, " (deleted)") {
-		return ""
-	}
-	return p
-}
-
-func parseRchar(io string) int64 {
-	for _, line := range strings.Split(io, "\n") {
-		if v, ok := strings.CutPrefix(line, "rchar: "); ok {
-			if n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64); err == nil {
-				return n
-			}
-		}
-	}
-	return 0
 }
 
 func (c *collector) addBinary(p string) {

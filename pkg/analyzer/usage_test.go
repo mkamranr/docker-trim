@@ -191,3 +191,66 @@ Installed-Size: 100
 		t.Errorf("packages = %+v, want only the installed one", pkgs)
 	}
 }
+
+// A traced open records the path the loader actually asked for, which is
+// usually /lib/..., while dpkg records the same file under /usr/lib/... because
+// /lib is a symlink. Failing to reconcile the two makes every library look
+// unowned and every library package look unused, which is the most dangerous
+// way this tool could be wrong.
+func TestAttributeUsage_reconciles_usrmerge_paths(t *testing.T) {
+	rep := imageWith(
+		Package{Name: "libc6", Files: []string{"/usr/lib/x86_64-linux-gnu/libc.so.6"}},
+		Package{Name: "libsqlite3-0", SizeBytes: 2 << 20,
+			Files: []string{"/usr/lib/x86_64-linux-gnu/libsqlite3.so.0"}},
+		Package{Name: "coreutils", Files: []string{"/usr/bin/cat"}},
+	)
+	// What a trace actually reports.
+	u := AttributeUsage(rep, TraceManifest{
+		SharedLibs:   []string{"/lib/x86_64-linux-gnu/libsqlite3.so.0"},
+		UsedBinaries: []string{"/bin/cat"},
+	})
+
+	used := map[string]bool{}
+	for _, p := range u.Used {
+		used[p.Name] = true
+	}
+	if !used["libsqlite3-0"] {
+		t.Error("/lib/.../libsqlite3.so.0 was not matched to the package owning /usr/lib/...")
+	}
+	if !used["coreutils"] {
+		t.Error("/bin/cat was not matched to the package owning /usr/bin/cat")
+	}
+	for _, p := range u.Unused {
+		if p.Name == "libsqlite3-0" || p.Name == "coreutils" {
+			t.Errorf("%s was used but reported as removable", p.Name)
+		}
+	}
+	if len(u.UnownedFiles) != 0 {
+		t.Errorf("unowned = %v, want none: every path belongs to a package", u.UnownedFiles)
+	}
+}
+
+func TestPathAliases(t *testing.T) {
+	cases := map[string][]string{
+		"/lib/x86_64-linux-gnu/libc.so.6":     {"/lib/x86_64-linux-gnu/libc.so.6", "/usr/lib/x86_64-linux-gnu/libc.so.6"},
+		"/usr/lib/x86_64-linux-gnu/libc.so.6": {"/usr/lib/x86_64-linux-gnu/libc.so.6", "/lib/x86_64-linux-gnu/libc.so.6"},
+		"/bin/sh":                             {"/bin/sh", "/usr/bin/sh"},
+		"/sbin/init":                          {"/sbin/init", "/usr/sbin/init"},
+		// Nothing outside the merged directories should grow an alias.
+		"/etc/hosts":     {"/etc/hosts"},
+		"/app/config.py": {"/app/config.py"},
+	}
+	for in, want := range cases {
+		got := pathAliases(in)
+		if len(got) != len(want) {
+			t.Errorf("pathAliases(%q) = %v, want %v", in, got, want)
+			continue
+		}
+		for i := range got {
+			if got[i] != want[i] {
+				t.Errorf("pathAliases(%q) = %v, want %v", in, got, want)
+				break
+			}
+		}
+	}
+}

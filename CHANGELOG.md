@@ -6,10 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The `ptrace` tracing backend** (`--tracer ptrace`). Where the sampler takes snapshots and
+  can miss whatever happens between two of them, this stops the traced process at every
+  syscall and records `execve` and `openat` on the way out, so a call that failed is never
+  counted as a use. The same Python command six times: `proc` observed 19 to 23 files and
+  caught the dynamically loaded `_sqlite3` in four runs of six; `ptrace` observed 53 files
+  and caught it in all six. It costs `CAP_SYS_PTRACE`, an unconfined seccomp profile, and
+  about twice the runtime on a syscall-heavy workload, which is why `proc` stays the default.
+
+  Entry and exit stops are distinguished with `PTRACE_GET_SYSCALL_INFO` rather than by
+  alternating, because alternating breaks the moment a process forks and silently drops
+  everything the child touches. Asking the kernel also means no per-architecture register
+  decoding: the same code is correct on x86-64 and arm64.
+
+### Fixed
+
+- **Library paths are reconciled with the package database.** A traced open records what the
+  loader asked for, usually `/lib/x86_64-linux-gnu/libc.so.6`, while dpkg records the same
+  file under `/usr/lib/...` because `/lib` is a symlink. Every library looked unowned and
+  every library package looked removable, which is the most dangerous way this could be
+  wrong.
+
 ### Planned
 
-- **The `ptrace` and `eBPF` tracing backends**, for exact `openat` data on hosts that can
-  support them. The `proc` sampler races with short-lived processes; `ptrace` does not.
+- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
+  kernel exposes BTF.
 - **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
   builds, and use `trivy` or `grype` automatically when either is on `PATH`.
 - **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package

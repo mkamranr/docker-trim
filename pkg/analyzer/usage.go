@@ -77,17 +77,17 @@ func AttributeUsage(rep *ImageReport, manifest TraceManifest) Usage {
 	touched := map[string]bool{}
 	var unowned []string
 	for _, f := range accessedPaths(manifest) {
-		if name, ok := owner[f]; ok {
-			touched[name] = true
-			continue
+		var found bool
+		for _, candidate := range pathAliases(f) {
+			if name, ok := owner[candidate]; ok {
+				touched[name] = true
+				found = true
+				break
+			}
 		}
-		// A symlink such as /usr/bin/python3 resolves to a real path the trace
-		// reports, but a package may own the link rather than the target.
-		if name, ok := owner[strings.TrimSuffix(f, "/")]; ok {
-			touched[name] = true
-			continue
+		if !found {
+			unowned = append(unowned, f)
 		}
-		unowned = append(unowned, f)
 	}
 	sort.Strings(unowned)
 	u.UnownedFiles = unowned
@@ -119,6 +119,35 @@ func accessedPaths(m TraceManifest) []string {
 				seen[f] = true
 				out = append(out, f)
 			}
+		}
+	}
+	return out
+}
+
+// usrMerged are the directories Debian and most modern distributions turned
+// into symlinks under /usr.
+var usrMerged = []string{"/lib/", "/lib64/", "/bin/", "/sbin/"}
+
+// pathAliases returns the ways a package database might spell a path.
+//
+// A traced open records the path the program actually asked for, which for a
+// shared library is whatever the loader found in ld.so.cache: usually
+// /lib/x86_64-linux-gnu/libc.so.6. dpkg records the same file as
+// /usr/lib/x86_64-linux-gnu/libc.so.6, because /lib is a symlink to /usr/lib.
+// Without reconciling the two, every library a trace observes looks unowned and
+// the package that provides it looks unused, which is the most dangerous way
+// this tool could be wrong.
+func pathAliases(p string) []string {
+	p = strings.TrimSuffix(p, "/")
+	out := []string{p}
+	for _, dir := range usrMerged {
+		if strings.HasPrefix(p, dir) {
+			out = append(out, "/usr"+p)
+			return out
+		}
+		if strings.HasPrefix(p, "/usr"+dir) {
+			out = append(out, strings.TrimPrefix(p, "/usr"))
+			return out
 		}
 	}
 	return out

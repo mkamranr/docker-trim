@@ -4,8 +4,8 @@ Static analysis can tell you a package is installed. Only running the container 
 whether anything uses it. That is what tracing is for, and it is what makes "remove the
 packages nothing touches" safe rather than hopeful.
 
-The `proc` backend ships. `ptrace` and `ebpf` are accepted and rejected with a pointer to
-the backend that works.
+The `proc` and `ptrace` backends ship. `ebpf` is accepted and rejected with a pointer to
+the backends that work.
 
 ```console
 $ dtrim --image myapp:latest --tracer proc --trace "pytest -q"
@@ -26,8 +26,8 @@ Runtime trace
 
 | Backend | How it observes | Privileges | Fidelity |
 | :--- | :--- | :--- | :--- |
-| `proc` | Samples `/proc/*/exe`, `/proc/*/maps`, `/proc/*/fd` every ~50 ms | none | Every binary executed and every shared library loaded. Misses a config file opened and closed between samples. |
-| `ptrace` | `PTRACE_SEIZE` on the process tree, decoding `execve` and `openat` | `CAP_SYS_PTRACE`, unconfined seccomp | Exact: every successful open, including config files |
+| `proc` | Samples `/proc/*/exe`, `/proc/*/maps`, `/proc/*/fd` every ~50 ms | none | Every binary executed and every shared library loaded. Misses a file opened and closed between samples. |
+| `ptrace` | Stops at every syscall, recording `execve` and `openat` on the way out | `CAP_SYS_PTRACE`, unconfined seccomp | Exact: every successful open, including config files and data |
 | `ebpf` | CO-RE probes on `sched:sched_process_exec` and `syscalls:sys_enter_openat` | privileged, and a kernel with BTF | Exact, with the lowest overhead |
 
 ## Why the default is `proc` and not eBPF
@@ -71,6 +71,49 @@ that is already running misses it.
 The manifest comes back through **stderr between markers**, not through a file or a bind
 mount: the image may run as a user who cannot write anywhere, and a mount would need a
 writable host path. dtrim reads the container's logs and takes what is between the markers.
+
+## Choosing between them
+
+`proc` is the default because it works everywhere. Reach for `ptrace` when the answer has to
+be exact: before actually removing a package, or when two runs of `proc` disagree.
+
+The same Python command, same image, six runs each:
+
+```
+            files observed        _sqlite3 caught
+  proc      19, 19, 22, 22, 23, 23      4 of 6
+  ptrace    53, 53, 53, 53, 53, 53      6 of 6
+```
+
+`ptrace` sees roughly 2.3x more and returns the same answer every time, because it does not
+sample: it stops the process at every syscall. `proc` only ever sees what is mapped or open
+at the instant it looks.
+
+Cost, measured on the same image: a Python startup plus a handful of imports is within noise
+of untraced, because it makes few syscalls. `python -m pip list`, which makes a great many,
+takes about **twice as long** under `ptrace` (3.7s against 1.8s). Every traced syscall is two
+extra context switches, so the overhead scales with syscall count rather than wall time.
+
+`ptrace` also needs privileges the sampler does not: `--cap-add=SYS_PTRACE` and
+`--security-opt seccomp=unconfined`, both applied only to the throwaway container dtrim
+builds for the trace. Some environments will not grant them, which is why the default
+backend asks for nothing.
+
+## How ptrace avoids the race
+
+Every syscall produces two stops: one going in, with the arguments, and one coming out, with
+the result. dtrim reads the path on the way in, holds it, and records it only if the call
+returned successfully. A file the program looked for and did not find is therefore never
+counted as used, which no amount of sampling can tell you.
+
+Telling the two stops apart is the part that looks easy and is not. A tracer that simply
+alternates entry, exit, entry, exit is correct until a process forks: the child's first stop
+is not the entry its bookkeeping expects, and from that point every entry is read as an exit.
+The symptom is that a shell script traces fine but everything it spawns silently vanishes —
+which is exactly the workload people pass to `--trace`. dtrim asks the kernel instead, with
+`PTRACE_GET_SYSCALL_INFO` (Linux 5.3 and later), which reports the stop, the syscall number
+and its arguments directly. That also means no per-architecture register decoding: the same
+code is correct on x86-64 and arm64.
 
 ## What sampling misses, measured
 

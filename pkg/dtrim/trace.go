@@ -70,7 +70,8 @@ func coverageNotes(r *tracer.Result, cfg Config) []string {
 				"startup. Pass --trace with a command that exercises the application before "+
 				"treating anything here as unused.")
 	}
-	if r.Samples <= 2 {
+	// Sampling coverage only means something for the sampler.
+	if r.Backend == tracer.BackendProc && r.Samples <= 2 {
 		notes = append(notes, fmt.Sprintf(
 			"The container was sampled only %d times, so almost nothing was observed. Treat "+
 				"the unused list as meaningless at this coverage.", r.Samples))
@@ -78,8 +79,9 @@ func coverageNotes(r *tracer.Result, cfg Config) []string {
 	// Sampling races with a short-lived process. A library loaded late in a
 	// command that lives half a second may appear in no sample at all, so the
 	// same trace run twice can disagree. Saying so is the difference between
-	// evidence and a number that looks authoritative.
-	if !r.TimedOut && r.Duration > 0 && r.Duration < time.Second {
+	// evidence and a number that looks authoritative. ptrace has no such race,
+	// so the warning would be false there.
+	if r.Backend == tracer.BackendProc && !r.TimedOut && r.Duration > 0 && r.Duration < time.Second {
 		notes = append(notes, fmt.Sprintf(
 			"The traced command ran for only %s, which is short enough that sampling will have "+
 				"missed things: a library loaded late may appear in no sample, and running this "+
@@ -91,10 +93,20 @@ func coverageNotes(r *tracer.Result, cfg Config) []string {
 			"The traced command exited with code %d. If it failed early, it did not reach the "+
 				"code paths that use the packages reported as unused.", r.ExitCode))
 	}
-	notes = append(notes,
-		"Sampling /proc sees every binary that ran and every library that loaded, and can "+
-			"miss a file opened and closed between two samples. It is evidence, not proof: "+
-			"dtrim reports what to consider removing and leaves the decision to you.")
+	switch r.Backend {
+	case tracer.BackendPtrace:
+		notes = append(notes,
+			"Every execve and openat was observed, and only calls that succeeded were counted, "+
+				"so nothing was missed within this run. What the run itself did not exercise is "+
+				"still invisible: dtrim reports what to consider removing and leaves the "+
+				"decision to you.")
+	default:
+		notes = append(notes,
+			"Sampling /proc sees every binary that ran and every library that loaded, and can "+
+				"miss a file opened and closed between two samples. --tracer ptrace misses "+
+				"nothing, at the cost of needing CAP_SYS_PTRACE. Either way this is evidence, "+
+				"not proof: dtrim reports what to consider removing and leaves the decision to you.")
+	}
 	return notes
 }
 

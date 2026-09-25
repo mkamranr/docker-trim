@@ -112,8 +112,18 @@ not a terminal.
 
 ### `--tracer`, `--trace`, `--trace-timeout`
 
-Run the image and record what it actually uses. `--tracer proc` is the backend that ships;
-`ptrace` and `ebpf` are accepted and rejected with a pointer to the one that works.
+Run the image and record what it actually uses.
+
+| Backend | Needs | Use it when |
+| :--- | :--- | :--- |
+| `proc` | nothing | The default. Works on Docker Desktop, hardened runners, anywhere. |
+| `ptrace` | `CAP_SYS_PTRACE`, unconfined seccomp | The answer has to be exact: before removing anything, or when two `proc` runs disagree. |
+| `ebpf` | — | Not implemented. |
+
+`ptrace` observes every successful `execve` and `openat` rather than sampling, so it sees
+roughly 2.3x more and returns the same answer every run. It costs about twice the runtime on
+a syscall-heavy workload, and needs privileges dtrim applies only to the throwaway container
+it builds for the trace. See [tracing.md](tracing.md) for the measurements.
 
 ```console
 $ dtrim --image myapp:latest --tracer proc --trace "pytest -q"

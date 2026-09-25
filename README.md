@@ -108,7 +108,7 @@ where the binary lands.
 | A container running as root | Injects `USER nonroot` or `USER 10001:10001` before the entrypoint |
 | `curl`, `wget`, `nc`, `git`, `gcc`, `sudo` in the final image | Reports each one and what it gives an attacker; the runtime stage leaves them behind |
 | A credential-shaped `ENV` or `ARG` | Reports it: every layer keeps it, so `docker history` reveals it |
-| A running container (`--tracer proc`) | Samples `/proc` from inside it to record every binary that ran and every library that loaded, then attributes those files back to the packages that installed them, so you can see what was never touched |
+| A running container (`--tracer`) | Runs it and records what it actually touches, then attributes those files back to the packages that installed them, so you can see what was never used. `proc` samples `/proc` and needs no privileges; `ptrace` observes every syscall and misses nothing |
 | A built image | Streams its layers and reports where the bytes went: caches, docs, locales, bytecode, files written then overwritten, files deleted but still shipped |
 
 It also knows when to do nothing. A Dockerfile that already builds in stages is left alone,
@@ -160,7 +160,7 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--no-diff` | | `false` | Skip the diff |
 | `--no-color` | | `false` | Disable colour (also honours `NO_COLOR`) |
 | `--trace` | `-t` | | Command to run inside the container while tracing |
-| `--tracer` | | `none` | Tracing backend: `proc` (`ptrace` and `ebpf` planned) |
+| `--tracer` | | `none` | Tracing backend: `proc` (no privileges) or `ptrace` (exact) |
 | `--trace-timeout` | | `30s` | How long to let a traced container run |
 | `--osv` | | `false` | Real CVE lookup — not implemented yet |
 
@@ -185,8 +185,9 @@ dtrim --analyze-only --fail-on high        # also refuse a shell, or running as 
                  (pure Go, streams   (dpkg / apk)          (embedded ruleset)   (text/JSON/
                   every layer tar)         │                                     markdown)
                                            ▼                                        │
-                 --tracer proc ──► run it and sample /proc ──► what went unused ─────┤
-                                  (no capabilities needed)                          │
+                 --tracer ──────► run it and watch ──────────► what went unused ─────┤
+                                  (proc samples /proc,                              │
+                                   ptrace sees every syscall)                       │
                                                                                     │
                                           --verify ──► build both, measure, start ──┘
 ```
