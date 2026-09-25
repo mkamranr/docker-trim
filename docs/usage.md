@@ -110,10 +110,37 @@ The output names the rules responsible, so a red pipeline explains itself withou
 Skip the diff; disable colour. Colour is also disabled when `NO_COLOR` is set or stdout is
 not a terminal.
 
-### `--trace`, `--tracer`, `--osv`
+### `--tracer`, `--trace`, `--trace-timeout`
 
-Accepted, and rejected with a pointer to the changelog. They exist so scripts written today
-keep working when runtime tracing and CVE lookup land in 0.2. See [tracing.md](tracing.md).
+Run the image and record what it actually uses. `--tracer proc` is the backend that ships;
+`ptrace` and `ebpf` are accepted and rejected with a pointer to the one that works.
+
+```console
+$ dtrim --image myapp:latest --tracer proc --trace "pytest -q"
+Runtime trace
+  Observed            : 45 files, 2 binaries, 39 shared libraries across 2 processes, 42 samples
+  Packages exercised  : 9 of 189
+  Never touched       : 139 packages, 484 MB if removed
+```
+
+`--trace` is the workload, run through `/bin/sh -c` so a pipe or a quoted argument survives.
+Without it, the trace covers only what the container does on startup, which is usually not
+enough to conclude anything. `--trace-timeout` (default 30s) caps the run; a server never
+exits on its own, so tracing one always ends there, and that is the normal path rather than
+an error.
+
+Tracing needs `--image`. It builds an ephemeral copy of that image, which takes a moment the
+first time.
+
+**Read the coverage line before acting on the unused list.** Sampling races with short-lived
+processes, so dtrim reports how long the command ran and says so when that was under a
+second. `docs/heuristics.md` and [tracing.md](tracing.md) explain what it can and cannot see.
+Removal is left to you: dtrim reports what to consider dropping and deletes nothing.
+
+### `--osv`
+
+Accepted, and rejected with a pointer to the changelog. It exists so scripts written today
+keep working when real CVE lookup lands. See the changelog.
 
 ## Recipes
 

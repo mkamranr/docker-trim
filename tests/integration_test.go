@@ -185,20 +185,54 @@ func TestExitCode_is_two_on_error(t *testing.T) {
 	}
 }
 
-// Flags for features that have not shipped must fail loudly and point at the
-// changelog, not silently do nothing.
-func TestDeferredFlags_fail_with_a_pointer_to_the_changelog(t *testing.T) {
-	for _, args := range [][]string{
-		{"-f", fixture("go-api.Dockerfile"), "--tracer", "proc"},
-		{"-f", fixture("go-api.Dockerfile"), "--osv"},
-	} {
-		r := dtrim(t, args...)
+// A backend that has not shipped must say so and name the one that has, rather
+// than failing with something generic or silently doing nothing.
+func TestUnimplementedBackends_name_the_one_that_works(t *testing.T) {
+	for _, backend := range []string{"ptrace", "ebpf"} {
+		r := dtrim(t, "--image", "busybox:latest", "--tracer", backend)
 		if r.code != 2 {
-			t.Errorf("%v: exit code = %d, want 2", args, r.code)
+			t.Errorf("--tracer %s: exit code = %d, want 2", backend, r.code)
 		}
-		if !strings.Contains(r.stderr, "CHANGELOG") {
-			t.Errorf("%v: stderr does not point at the changelog: %q", args, r.stderr)
+		if !strings.Contains(r.stderr, "not implemented") {
+			t.Errorf("--tracer %s: stderr = %q", backend, r.stderr)
 		}
+		if !strings.Contains(r.stderr, "proc") {
+			t.Errorf("--tracer %s does not point at the backend that works: %q", backend, r.stderr)
+		}
+	}
+}
+
+// --osv is still unbuilt, and must point at the changelog rather than quietly
+// producing a report with no CVE data in it.
+func TestOSV_is_still_deferred(t *testing.T) {
+	r := dtrim(t, "-f", fixture("go-api.Dockerfile"), "--osv")
+	if r.code != 2 {
+		t.Errorf("exit code = %d, want 2", r.code)
+	}
+	if !strings.Contains(r.stderr, "CHANGELOG") {
+		t.Errorf("stderr does not point at the changelog: %q", r.stderr)
+	}
+}
+
+// Tracing needs something to run, and saying which flag is missing is more
+// useful than a generic validation error.
+func TestTracerWithoutAnImage_says_which_flag_is_missing(t *testing.T) {
+	r := dtrim(t, "-f", fixture("go-api.Dockerfile"), "--tracer", "proc")
+	if r.code != 2 {
+		t.Fatalf("exit code = %d, want 2", r.code)
+	}
+	if !strings.Contains(r.stderr, "--image") {
+		t.Errorf("stderr does not name the missing flag: %q", r.stderr)
+	}
+}
+
+func TestTraceWithoutABackend_says_which_flag_is_missing(t *testing.T) {
+	r := dtrim(t, "--image", "busybox:latest", "--trace", "echo hi")
+	if r.code != 2 {
+		t.Fatalf("exit code = %d, want 2", r.code)
+	}
+	if !strings.Contains(r.stderr, "--tracer") {
+		t.Errorf("stderr does not name the missing flag: %q", r.stderr)
 	}
 }
 
@@ -226,26 +260,31 @@ func TestMarkdown_renders_a_pull_request_report(t *testing.T) {
 	}
 }
 
-func TestHelp_does_not_advertise_what_is_not_built(t *testing.T) {
+// The help must not imply a feature works when it does not, and must not keep
+// warning about one that now does.
+func TestHelp_describes_what_is_actually_built(t *testing.T) {
 	r := dtrim(t, "--help")
 	if r.code != 0 {
 		t.Fatalf("exit code = %d", r.code)
 	}
-	// The flags exist so scripts keep working, but the help has to say they
-	// are not ready rather than implying they work.
-	for _, flag := range []string{"--trace", "--tracer", "--osv"} {
-		idx := strings.Index(r.stdout, flag)
-		if idx < 0 {
-			t.Errorf("%s missing from help", flag)
-			continue
+	helpFor := func(flag string) string {
+		for _, line := range strings.Split(r.stdout, "\n") {
+			if strings.Contains(line, flag+" ") && strings.HasPrefix(strings.TrimSpace(line), "-") {
+				return line
+			}
 		}
-		line := r.stdout[idx:]
-		if end := strings.IndexByte(line, '\n'); end > 0 {
-			line = line[:end]
-		}
-		if !strings.Contains(line, "0.2") {
-			t.Errorf("help for %s does not say it is planned for 0.2: %q", flag, line)
-		}
+		return ""
+	}
+
+	if line := helpFor("--osv"); !strings.Contains(line, "0.2") {
+		t.Errorf("--osv is not built, so its help should say so: %q", line)
+	}
+	if line := helpFor("--tracer"); !strings.Contains(line, "planned") {
+		t.Errorf("--tracer help should name which backends are still planned: %q", line)
+	}
+	// --trace works now, so its help must no longer claim otherwise.
+	if line := helpFor("--trace"); strings.Contains(line, "0.2") || strings.Contains(line, "planned") {
+		t.Errorf("--trace is implemented, but its help still defers it: %q", line)
 	}
 }
 

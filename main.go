@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -77,6 +78,7 @@ type flags struct {
 	osv            bool
 	buildContext   string
 	failOn         string
+	traceTimeout   time.Duration
 	noColor        bool
 	verbose        bool
 	markdown       bool
@@ -104,6 +106,7 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 			"  dtrim --analyze-only myapp:latest",
 			"  dtrim --analyze-only myapp:latest --quiet | jq .image.categories",
 			"  dtrim --analyze-only --fail-on high   # exits 1 if the image ships a shell",
+			"  dtrim --image myapp:latest --tracer proc --trace \"pytest -q\"",
 		}, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := configure(cmd, &f, args)
@@ -126,7 +129,7 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	fl := cmd.Flags()
 	fl.StringVarP(&f.file, "file", "f", "", "Path to the target Dockerfile to parse and optimize (default \"Dockerfile\")")
 	fl.StringVarP(&f.image, "image", "i", "", "Target image tag to inspect and dynamically trace")
-	fl.StringVarP(&f.trace, "trace", "t", "", "Test command to run inside container during tracing (planned for 0.2)")
+	fl.StringVarP(&f.trace, "trace", "t", "", "Command to run inside the container while tracing; needs --tracer")
 	fl.StringVarP(&f.base, "base", "b", "distroless", "Target minimal base image: distroless, alpine, scratch")
 	fl.StringVarP(&f.output, "output", "o", "Dockerfile.trimmed", "Path to write optimized Dockerfile")
 	fl.BoolVar(&f.analyzeOnly, "analyze-only", false, "Run static analysis without modifying or generating files")
@@ -137,7 +140,8 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	fl.BoolVar(&f.optimize, "optimize", false, "Rewrite the Dockerfile and write the result to --output")
 	fl.BoolVar(&f.verify, "verify", false, "Build both Dockerfiles and report measured sizes, then start the trimmed image")
 	fl.StringVar(&f.aggressiveness, "aggressiveness", "likely", "How much to change: safe, likely, aggressive")
-	fl.StringVar(&f.tracer, "tracer", "none", "Runtime tracing backend: none, proc, ptrace, ebpf (planned for 0.2)")
+	fl.StringVar(&f.tracer, "tracer", "none", "Runtime tracing backend: none, proc (ptrace and ebpf are planned)")
+	fl.DurationVar(&f.traceTimeout, "trace-timeout", 30*time.Second, "How long to let a traced container run")
 	fl.BoolVar(&f.osv, "osv", false, "Look up real CVEs from api.osv.dev (planned for 0.2)")
 	fl.StringVar(&f.buildContext, "context", "", "Build context directory (default: the Dockerfile's directory)")
 	fl.StringVar(&f.failOn, "fail-on", "", "Exit 1 when a finding of this severity or worse survives: info, low, medium, high, critical")
@@ -155,6 +159,10 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 	cfg := dtrim.DefaultConfig()
 	cfg.Stdout = cmd.OutOrStdout()
 	cfg.Stderr = cmd.ErrOrStderr()
+	// Start with no file so the default below can tell "the user said nothing"
+	// from "the user asked for a Dockerfile". Otherwise `dtrim --image x` also
+	// analyses whatever Dockerfile happens to be in the working directory.
+	cfg.File = ""
 
 	// A single positional argument is whichever of the two it looks like, so
 	// `dtrim myapp:latest` and `dtrim ./Dockerfile` both do the obvious thing.
@@ -171,13 +179,9 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 	if f.image != "" {
 		cfg.Image = f.image
 	}
-	// Only default to ./Dockerfile when nothing else was named, so
-	// `dtrim --image x` does not also try to analyze a file that happens to
-	// be in the working directory.
+	// Only fall back to ./Dockerfile when nothing at all was named.
 	if cfg.File == "" && cfg.Image == "" {
 		cfg.File = "Dockerfile"
-	} else if f.file == "" && len(args) == 0 {
-		cfg.File = firstNonEmpty(cfg.File, "")
 	}
 
 	base, err := dtrim.ParseBase(f.base)
@@ -200,6 +204,7 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 	cfg.Aggressiveness = dtrim.Confidence(f.aggressiveness)
 	cfg.OSV = f.osv
 	cfg.Context = f.buildContext
+	cfg.TraceTimeout = f.traceTimeout
 	cfg.NoColor = f.noColor
 	cfg.Verbose = f.verbose
 
@@ -253,13 +258,4 @@ func looksLikeDockerfile(arg string) bool {
 		base = base[i+1:]
 	}
 	return strings.Contains(base, "dockerfile")
-}
-
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }

@@ -24,14 +24,35 @@ type Report struct {
 
 	Dockerfile *DockerfileReport     `json:"dockerfile,omitempty"`
 	Image      *analyzer.ImageReport `json:"image,omitempty"`
-	Security   *security.Assessment  `json:"security,omitempty"`
-	Result     OptimizationResult    `json:"optimization"`
+	// Trace is present when a tracing backend actually ran.
+	Trace    *TraceReport         `json:"trace,omitempty"`
+	Security *security.Assessment `json:"security,omitempty"`
+	Result   OptimizationResult   `json:"optimization"`
 	// Verification is present only when --verify actually built both images,
 	// which is the only way a size in this report is a measurement.
 	Verification *Verification `json:"verification,omitempty"`
 	Findings     []Finding     `json:"findings"`
 	Fixed        []Finding     `json:"fixed,omitempty"`
 	Notes        []string      `json:"notes,omitempty"`
+}
+
+// TraceReport is what watching the container showed.
+type TraceReport struct {
+	Backend string `json:"backend"`
+	// Command is what ran inside the container.
+	Command []string `json:"command"`
+	// Manifest is the PRD's TraceManifest: what the container touched.
+	Manifest TraceManifest `json:"manifest"`
+	// Usage attributes those files back to installed packages.
+	Usage analyzer.Usage `json:"usage"`
+	// Samples, Processes, ExitCode and TimedOut describe how much the trace
+	// actually saw, which is what decides whether its conclusions are worth
+	// acting on.
+	Samples    int   `json:"samples"`
+	Processes  int   `json:"processes"`
+	ExitCode   int   `json:"exitCode"`
+	TimedOut   bool  `json:"timedOut"`
+	DurationMS int64 `json:"durationMs"`
 }
 
 // Breaches returns the findings at or above the given severity that a run
@@ -92,7 +113,12 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 	rep := &Report{SchemaVersion: SchemaVersion, Tool: "dtrim"}
 
 	if cfg.Image != "" {
-		img, err := analyzer.InspectImage(ctx, cfg.Image)
+		// Ownership costs extra reading and is only useful next to a trace.
+		inspect := analyzer.InspectImage
+		if cfg.Tracer != TracerNone {
+			inspect = analyzer.InspectImageWithOwnership
+		}
+		img, err := inspect(ctx, cfg.Image)
 		if err != nil {
 			return nil, err
 		}
@@ -103,6 +129,12 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 		assessment := security.Compare(surface, nil)
 		rep.Security = &assessment
 		rep.Result.OriginalSizeBytes = img.TotalSize
+
+		if cfg.Tracer != TracerNone {
+			if err := runTrace(ctx, cfg, rep); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if cfg.File != "" {

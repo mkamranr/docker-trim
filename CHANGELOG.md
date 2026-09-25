@@ -8,11 +8,34 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Runtime tracing** (`--tracer proc`, `--trace`, `--trace-timeout`). dtrim builds an
+  ephemeral copy of the image with a sensor wrapping its entrypoint, runs it, and samples
+  `/proc/*/exe`, `/proc/*/maps` and `/proc/*/fd` to record every binary that ran and every
+  library that loaded. Those files are attributed back to the packages that installed them
+  through the dpkg and apk databases, so the report says how many packages were exercised and
+  what was never touched. On a 599MB Python image: 9 of 189 packages used, 139 never touched,
+  484MB of them, led by gcc, git, vim and perl.
+
+  The sensor needs no capabilities, no seccomp changes and no kernel features, which is what
+  makes it work on Docker Desktop and on hardened runners. Its source is embedded and
+  compiled inside the ephemeral build, so it is always the right architecture and no binary
+  lives in the repository. See [docs/tracing.md](docs/tracing.md).
+
+  Removal stays manual. dtrim reports what to consider dropping; it does not delete packages
+  on the strength of one trace.
+
 - **`--fail-on <severity>`**, so a pipeline can reject a Dockerfile that bakes in a
   credential or ships a shell, without piping the JSON report through `jq`. Only unfixed
   findings count, and the output names the rules responsible.
 
 ### Changed
+
+- **Only dpkg priority `required` counts as structural**, not `important`. Debian's
+  `important` means "expected on a Unix-like system" and covers `vim-tiny`, `nano`, `less`
+  and `procps`, all of which a container can lose; treating them as untouchable hid most of
+  what a trace is for. Priority was never what protected the packages that matter anyway:
+  `libc6` is priority `optional`, and the loader, trust store and time zone data are excluded
+  by name instead.
 
 - **Exit code `1` now means "findings met the `--fail-on` threshold".** Previously there
   were only two codes; `2` still means dtrim itself could not run. Keeping them apart is
@@ -21,12 +44,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Planned for 0.2
 
-- **Runtime tracing** (`--trace`, `--tracer`). A static sensor injected into the container
-  records which binaries and shared libraries the process actually loads, so unused packages
-  can be removed with evidence rather than heuristics. The `proc` backend samples
-  `/proc/*/exe`, `/proc/*/maps` and `/proc/*/fd` and needs no added capabilities, which is
-  what makes it work on Docker Desktop; `ptrace` and `ebpf` follow for exact `openat` data on
-  hosts that can support them. See [docs/tracing.md](docs/tracing.md).
+- **The `ptrace` and `eBPF` tracing backends**, for exact `openat` data on hosts that can
+  support them. The `proc` sampler races with short-lived processes; `ptrace` does not.
 - **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
   builds, and use `trivy` or `grype` automatically when either is on `PATH`.
 - **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
@@ -72,8 +91,6 @@ First release.
   roughly 10 seconds for a 260 MB image and minutes for a multi-gigabyte one. The layer walk
   itself is around 30 ms per layer; the export is all of the rest. Reading from a registry
   instead of the local daemon skips the export and is faster.
-- **No runtime tracing.** `--trace` and `--tracer` are accepted and rejected with a pointer
-  here rather than silently doing nothing. Everything in 0.1 is static analysis.
 - **No CVE counts.** The report says `n/a` rather than printing a vulnerability number dtrim
   did not measure. Attack-surface metrics are reported instead.
 - **No rpm support.** RHEL-family images are detected and reported as unsupported for package

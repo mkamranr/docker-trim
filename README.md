@@ -108,6 +108,7 @@ where the binary lands.
 | A container running as root | Injects `USER nonroot` or `USER 10001:10001` before the entrypoint |
 | `curl`, `wget`, `nc`, `git`, `gcc`, `sudo` in the final image | Reports each one and what it gives an attacker; the runtime stage leaves them behind |
 | A credential-shaped `ENV` or `ARG` | Reports it: every layer keeps it, so `docker history` reveals it |
+| A running container (`--tracer proc`) | Samples `/proc` from inside it to record every binary that ran and every library that loaded, then attributes those files back to the packages that installed them, so you can see what was never touched |
 | A built image | Streams its layers and reports where the bytes went: caches, docs, locales, bytecode, files written then overwritten, files deleted but still shipped |
 
 It also knows when to do nothing. A Dockerfile that already builds in stages is left alone,
@@ -158,8 +159,9 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--verbose` | | `false` | Show every finding, and the underlying build output |
 | `--no-diff` | | `false` | Skip the diff |
 | `--no-color` | | `false` | Disable colour (also honours `NO_COLOR`) |
-| `--trace` | `-t` | | Command to run while tracing — planned for 0.2 |
-| `--tracer` | | `none` | Tracing backend — planned for 0.2 |
+| `--trace` | `-t` | | Command to run inside the container while tracing |
+| `--tracer` | | `none` | Tracing backend: `proc` (`ptrace` and `ebpf` planned) |
+| `--trace-timeout` | | `30s` | How long to let a traced container run |
 | `--osv` | | `false` | Real CVE lookup — planned for 0.2 |
 
 Exit codes: `0` clean, `1` when `--fail-on` was given and something met the threshold, `2`

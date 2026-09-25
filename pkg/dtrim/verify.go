@@ -2,8 +2,6 @@ package dtrim
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -51,7 +49,7 @@ func verify(ctx context.Context, cfg Config, rep *Report) error {
 		buildContext = filepath.Dir(cfg.File)
 	}
 
-	id := shortHash(cfg.File + df.Trimmed)
+	id := tracer.ShortHash(cfg.File + df.Trimmed)
 	origTag := "dtrim-verify-original:" + id
 	trimTag := "dtrim-verify-trimmed:" + id
 	defer tracer.Remove(context.WithoutCancel(ctx), origTag, trimTag)
@@ -108,9 +106,4 @@ func verify(ctx context.Context, cfg Config, rep *Report) error {
 		}
 	}
 	return nil
-}
-
-func shortHash(s string) string {
-	sum := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(sum[:])[:12]
 }

@@ -3,33 +3,25 @@ package dtrim
 import (
 	"fmt"
 	"io"
+	"time"
+
+	"github.com/mkamranr/dtrim/pkg/tracer"
 )
 
-// TracerBackend selects how runtime tracing observes the container.
-//
-// Only "none" does anything in v0.1; the others are accepted and rejected with
-// a pointer at the changelog so scripts written today keep working when the
-// tracer lands. See docs/tracing.md for why the /proc sampler is the default
-// backend rather than eBPF.
-type TracerBackend string
+// TracerBackend selects how runtime tracing observes the container. See
+// docs/tracing.md for why the /proc sampler is the default rather than eBPF.
+type TracerBackend = tracer.Backend
 
-// The runtime tracing backends. Only TracerNone does anything in this release;
-// see docs/tracing.md.
+// The runtime tracing backends.
 const (
-	TracerNone   TracerBackend = "none"
-	TracerProc   TracerBackend = "proc"
-	TracerPtrace TracerBackend = "ptrace"
-	TracerEBPF   TracerBackend = "ebpf"
+	TracerNone   = tracer.BackendNone
+	TracerProc   = tracer.BackendProc
+	TracerPtrace = tracer.BackendPtrace
+	TracerEBPF   = tracer.BackendEBPF
 )
 
 // ParseTracer validates the --tracer value.
-func ParseTracer(s string) (TracerBackend, error) {
-	switch TracerBackend(s) {
-	case TracerNone, TracerProc, TracerPtrace, TracerEBPF:
-		return TracerBackend(s), nil
-	}
-	return "", fmt.Errorf("unknown tracer %q: want none, proc, ptrace or ebpf", s)
-}
+func ParseTracer(s string) (TracerBackend, error) { return tracer.ParseBackend(s) }
 
 // Config is everything the pipeline needs. It carries no CLI dependency, so the
 // library can be driven from Go directly; see docs/library.md.
@@ -59,6 +51,9 @@ type Config struct {
 	Tracer TracerBackend
 	// OSV enriches the report with real CVE data from api.osv.dev.
 	OSV bool
+	// TraceTimeout caps how long a traced container runs. A server never exits
+	// on its own, so tracing one always ends here.
+	TraceTimeout time.Duration
 	// Context is the build context directory. Defaults to the Dockerfile's
 	// directory.
 	Context string
@@ -84,6 +79,7 @@ func DefaultConfig() Config {
 		Output:         "Dockerfile.trimmed",
 		Aggressiveness: ConfidenceLikely,
 		Tracer:         TracerNone,
+		TraceTimeout:   30 * time.Second,
 	}
 }
 
@@ -110,10 +106,15 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("--analyze-only and --verify conflict: verification has to build images")
 	}
 	if c.Trace != "" && c.Tracer == TracerNone {
-		return fmt.Errorf("--trace needs a --tracer backend; runtime tracing lands in 0.2 (see CHANGELOG)")
+		return fmt.Errorf("--trace needs a tracing backend: add --tracer proc")
 	}
 	if c.Tracer != TracerNone {
-		return fmt.Errorf("--tracer %s is not implemented in this release; runtime tracing is planned for 0.2 (see CHANGELOG)", c.Tracer)
+		if c.Image == "" {
+			return fmt.Errorf("--tracer needs an image to run: add --image")
+		}
+		if _, err := tracer.New(c.Tracer); err != nil {
+			return err
+		}
 	}
 	return nil
 }

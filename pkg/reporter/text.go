@@ -84,6 +84,7 @@ func Text(w io.Writer, rep *dtrim.Report, opt Options) error {
 	b := &strings.Builder{}
 
 	writeProgress(b, p, rep)
+	writeTrace(b, p, rep, opt)
 	writeFindings(b, p, rep, opt)
 	writeSummary(b, p, rep)
 	writeWarnings(b, p, rep)
@@ -118,9 +119,19 @@ func writeGate(b *strings.Builder, p palette, rep *dtrim.Report, opt Options) {
 		string(opt.FailOn), strings.Join(rules, ", "))
 }
 
+// plural adds the right suffix. "process" needs "es", and getting that wrong
+// is visible in the first line of output.
 func plural(word string, n int) string {
 	if n == 1 {
 		return word
+	}
+	switch {
+	case strings.HasSuffix(word, "s"), strings.HasSuffix(word, "x"),
+		strings.HasSuffix(word, "z"), strings.HasSuffix(word, "ch"),
+		strings.HasSuffix(word, "sh"):
+		return word + "es"
+	case strings.HasSuffix(word, "y") && !strings.ContainsAny(word[len(word)-2:len(word)-1], "aeiou"):
+		return word[:len(word)-1] + "ies"
 	}
 	return word + "s"
 }
@@ -158,6 +169,50 @@ func writeProgress(b *strings.Builder, p palette, rep *dtrim.Report) {
 			// validated: it was started and watched, not exercised.
 			fmt.Fprintf(b, "%s Built both images; trimmed image %s\n", tag, p.good(v.Smoke.Reason))
 		}
+	}
+}
+
+// writeTrace reports what running the container showed, and how much of the
+// program that trace actually covered.
+func writeTrace(b *strings.Builder, p palette, rep *dtrim.Report, opt Options) {
+	t := rep.Trace
+	if t == nil {
+		return
+	}
+	u := t.Usage
+
+	fmt.Fprintf(b, "\n%s\n", p.bold("Runtime trace"))
+	fmt.Fprintf(b, "  Observed            : %s across %d %s, %d %s\n",
+		t.TraceSummary(), t.Processes, plural("process", t.Processes),
+		t.Samples, plural("sample", t.Samples))
+
+	if total := len(u.Used) + len(u.Unused) + len(u.Essential); total > 0 {
+		fmt.Fprintf(b, "  Packages exercised  : %d of %d\n", len(u.Used), total)
+		if len(u.Unused) > 0 {
+			fmt.Fprintf(b, "  Never touched       : %d %s, %s if removed %s\n",
+				len(u.Unused), plural("package", len(u.Unused)),
+				humanize.Bytes(uint64(u.RemovableBytes)),
+				p.dim("(as the package database reports it)"))
+		}
+		if len(u.Essential) > 0 {
+			fmt.Fprintf(b, "  Kept regardless     : %d %s %s\n",
+				len(u.Essential), plural("package", len(u.Essential)),
+				p.dim("(libc, the loader, trust store, time zones)"))
+		}
+	}
+
+	limit := 10
+	if opt.Verbose {
+		limit = len(u.Unused)
+	}
+	for i, pkg := range u.Unused {
+		if i >= limit {
+			fmt.Fprintf(b, "      %s\n", p.dim(fmt.Sprintf("... and %d more, run with --verbose to see them",
+				len(u.Unused)-limit)))
+			break
+		}
+		fmt.Fprintf(b, "      %s %-28s %s\n", p.warn("-"), pkg.Name,
+			p.dim(humanize.Bytes(uint64(pkg.SizeBytes))))
 	}
 }
 
@@ -280,6 +335,9 @@ func writeWarnings(b *strings.Builder, p palette, rep *dtrim.Report) {
 	all = append(all, rep.Notes...)
 	if rep.Security != nil {
 		all = append(all, rep.Security.Notes...)
+	}
+	if rep.Trace != nil {
+		all = append(all, rep.Trace.Usage.Notes...)
 	}
 	if len(all) == 0 {
 		return

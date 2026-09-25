@@ -94,9 +94,9 @@ twice. These were read from the published image configurations, not assumed:
   needs, and only you know that.
 - **It does not pin your base image.** A floating tag is reported. Choosing the digest is a
   decision about your supply chain, not a formatting fix.
-- **It does not remove packages it has not seen used.** That is what runtime tracing is for,
-  and until it ships, dtrim reports what a package gives an attacker rather than deleting it
-  and hoping.
+- **It does not remove packages, even ones a trace never touched.** `--tracer proc` reports
+  what went unused; deleting it is your call. A trace only covers the code paths you
+  exercised, and the package that goes unused all week is the one your error handler needs.
 - **It does not rewrite an already multi-stage file.**
 - **It does not touch the network**, except when you pass `--image` with a reference the local
   daemon does not have, or `--verify`, which builds.

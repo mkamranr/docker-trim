@@ -77,6 +77,10 @@ type Package struct {
 	// SizeBytes is the installed size the package database reports, in bytes.
 	SizeBytes int64 `json:"sizeBytes"`
 	Essential bool  `json:"essential"`
+	// Files are the paths the package owns. Populated only when the inspection
+	// asked for ownership, which is what a trace needs to attribute a used file
+	// back to the package that put it there.
+	Files []string `json:"-"`
 }
 
 // bloatCategories classify a path by why it did not need to ship. Order
@@ -184,7 +188,31 @@ func InspectImage(ctx context.Context, ref string) (*ImageReport, error) {
 		}
 		source = "registry"
 	}
-	return inspect(ctx, ref, source, img)
+	return inspect(ctx, ref, source, img, false)
+}
+
+// InspectImageWithOwnership is InspectImage plus the package file lists, which
+// is what turns a trace into "these packages were never touched". It reads more
+// of the image, so it is a separate entry point rather than the default.
+func InspectImageWithOwnership(ctx context.Context, ref string) (*ImageReport, error) {
+	parsed, err := name.ParseReference(ref)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse image reference %q: %w", ref, err)
+	}
+	source := "daemon"
+	img, err := daemon.Image(parsed, daemon.WithContext(ctx))
+	if err != nil {
+		var remoteErr error
+		img, remoteErr = remote.Image(parsed,
+			remote.WithContext(ctx),
+			remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		if remoteErr != nil {
+			return nil, fmt.Errorf("cannot read %s from the Docker daemon (%v) or its registry: %w",
+				ref, err, remoteErr)
+		}
+		source = "registry"
+	}
+	return inspect(ctx, ref, source, img, true)
 }
 
 // fileRecord tracks where a path was last written, so a path written twice can
@@ -194,7 +222,7 @@ type fileRecord struct {
 	size  int64
 }
 
-func inspect(ctx context.Context, ref, source string, img v1.Image) (*ImageReport, error) {
+func inspect(ctx context.Context, ref, source string, img v1.Image, withFiles bool) (*ImageReport, error) {
 	rep := &ImageReport{Reference: ref, Source: source, Categories: map[string]int64{}}
 
 	if cf, err := img.ConfigFile(); err == nil {
@@ -210,7 +238,7 @@ func inspect(ctx context.Context, ref, source string, img v1.Image) (*ImageRepor
 
 	var (
 		seen     = make(map[string]fileRecord, 1<<14)
-		pkgFiles = newPackageDB()
+		pkgFiles = newPackageDB(withFiles)
 		all      []FileInfo
 	)
 

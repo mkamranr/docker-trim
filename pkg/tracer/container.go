@@ -14,6 +14,8 @@ package tracer
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -193,6 +195,12 @@ func sanitize(s string) string {
 		}
 	}
 	return b.String()
+}
+
+// ShortHash makes a stable, filesystem-safe suffix for an ephemeral tag.
+func ShortHash(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])[:12]
 }
 
 // tail keeps the last n lines, which is where a build or a crash says why.

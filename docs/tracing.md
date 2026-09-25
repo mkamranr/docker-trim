@@ -4,9 +4,23 @@ Static analysis can tell you a package is installed. Only running the container 
 whether anything uses it. That is what tracing is for, and it is what makes "remove the
 packages nothing touches" safe rather than hopeful.
 
-It is **not in 0.1**. `--trace` and `--tracer` are accepted and rejected with a pointer to
-the changelog, so scripts written today keep working when it lands. This document explains
-the design that is being built.
+The `proc` backend ships. `ptrace` and `ebpf` are accepted and rejected with a pointer to
+the backend that works.
+
+```console
+$ dtrim --image myapp:latest --tracer proc --trace "pytest -q"
+[dtrim] building an instrumented copy of myapp:latest
+[dtrim] running /bin/sh -c pytest -q under the sampler for up to 30s
+
+Runtime trace
+  Observed            : 45 files, 2 binaries, 39 shared libraries across 2 processes, 42 samples
+  Packages exercised  : 9 of 189
+  Never touched       : 139 packages, 484 MB if removed (as the package database reports it)
+  Kept regardless     : 41 packages (libc, the loader, trust store, time zones)
+      - gcc-14-x86-64-linux-gnu      70 MB
+      - git                          50 MB
+      - vim-runtime                  39 MB
+```
 
 ## The backends
 
@@ -33,18 +47,58 @@ and apk databases dtrim already reads.
 
 ## How the sensor gets in
 
-dtrim embeds a static `CGO_ENABLED=0` Linux sensor and injects it as an entrypoint wrapper
-into an ephemeral image:
+dtrim builds an ephemeral copy of the target image with the sensor wrapping its entrypoint:
 
 ```dockerfile
+FROM golang:1.25-alpine AS dtrim-sensor
+COPY sensor.go .
+RUN go mod init dtrimsensor && CGO_ENABLED=0 go build -o /dtrim-sensor .
+
 FROM <target>
-COPY dtrim-sensor /.dtrim/sensor
-ENTRYPOINT ["/.dtrim/sensor", "--"]
+COPY --from=dtrim-sensor /dtrim-sensor /.dtrim/sensor
+ENTRYPOINT ["/.dtrim/sensor","--"]
+CMD [<the original entrypoint and command, or your --trace command>]
 ```
 
+The sensor's **source** is embedded in dtrim and compiled inside that build, rather than
+shipped as a binary. It is therefore always the right architecture, needs no
+cross-compilation matrix, and no executable has to live in the repository.
+
 Wrapping the entrypoint means tracing starts at PID 1, so the loader activity during startup
-is captured — which is where most of the shared-library truth is. Attaching to a container
+is captured, which is where most of the shared-library truth is. Attaching to a container
 that is already running misses it.
+
+The manifest comes back through **stderr between markers**, not through a file or a bind
+mount: the image may run as a user who cannot write anywhere, and a mount would need a
+writable host path. dtrim reads the container's logs and takes what is between the markers.
+
+## What sampling misses, measured
+
+Sampling races with a short-lived process. Here is the same image and the same command, six
+times in a row, counting the Python modules loaded on demand that the trace caught:
+
+```
+run 1: 10 modules   _sqlite3 seen
+run 2:  3 modules   _sqlite3 missed
+run 3:  6 modules   _sqlite3 missed
+run 4:  8 modules   _sqlite3 missed
+run 5: 10 modules   _sqlite3 seen
+run 6:  8 modules   _sqlite3 missed
+```
+
+The command lives about forty milliseconds. A module imported near the end of it can finish
+loading between two samples and appear in none of them. Shortening the interval does not
+fix this: at 2ms the same set came back.
+
+What is reliable is anything mapped for the life of the process, which is the interpreter,
+every library it links against, and every long-lived worker. That is also what accounts for
+most of an image.
+
+So dtrim reports **how long the traced command ran** and warns when it was under a second,
+because a user who cannot tell a thorough trace from two frames of a forty-millisecond
+process will read "139 packages unused" as a fact. Give it a real workload with `--trace`,
+and treat the output as evidence rather than proof. `ptrace` exists on the roadmap precisely
+because it has no such race.
 
 ## From a trace to a smaller image
 
@@ -54,6 +108,16 @@ that is already running misses it.
    `/lib/apk/db/installed`, both of which dtrim already parses during layer inspection.
 3. `removable = installed − used − essential`, where the essential set is never touched:
    libc, the dynamic loader, `ca-certificates`, `tzdata`, `base-files`.
-4. The result is reported. Removal stays opt-in, because a trace only proves what the code
-   paths you exercised needed. Pass a representative workload with `--trace`, and treat the
-   output as evidence rather than proof.
+4. The result is reported. **Removal stays manual**: dtrim tells you what to consider
+   dropping and leaves the decision to the person who knows the workload. A trace only
+   covers the code paths you exercised, and the package that goes unused all week is the one
+   your error handler needs.
+
+The never-removed set is not a heuristic about what looked unused. The dynamic loader is
+read only at exec time, a trust store only when something opens a TLS connection, and time
+zone data only when something formats a local time. A short trace touches none of them and
+would happily suggest deleting all three, so they are excluded by name.
+
+Note that Debian priorities are not a safe proxy here: `libc6` is priority `optional`, while
+`vim-tiny` is `important`. dtrim treats only `Essential: yes` and priority `required` as
+structural, and protects the rest by name.
