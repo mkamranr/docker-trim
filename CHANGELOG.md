@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Planned
+
+- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
+  kernel exposes BTF.
+- **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
+  builds, and use `trivy` or `grype` automatically when either is on `PATH`.
+- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
+  reporting that Debian and Alpine images already get.
+- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.3.0] - 2026-09-25
+
 ### Added
 
 - **The `ptrace` tracing backend** (`--tracer ptrace`). Where the sampler takes snapshots and
@@ -29,15 +41,15 @@ All notable changes to this project are documented here. The format follows
   every library package looked removable, which is the most dangerous way this could be
   wrong.
 
-### Planned
+### Known limitations
 
-- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
-  kernel exposes BTF.
-- **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
-  builds, and use `trivy` or `grype` automatically when either is on `PATH`.
-- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
-  reporting that Debian and Alpine images already get.
-- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+- **ptrace is not free.** It needs `CAP_SYS_PTRACE` and an unconfined seccomp profile, which
+  some environments will not grant, and costs roughly twice the runtime on a syscall-heavy
+  workload. `proc` remains the default for exactly that reason.
+- **It needs Linux 5.3 or later**, for `PTRACE_GET_SYSCALL_INFO`. An older kernel is detected
+  and reported, pointing at `--tracer proc`.
+- **A trace still only covers what you exercised.** ptrace removes the sampling race, not the
+  need for a representative workload. dtrim still removes nothing on its own.
 
 ## [0.2.0] - 2026-09-25
 
@@ -159,6 +171,7 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.0
 [0.2.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.2.0
 [0.1.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.1.0
