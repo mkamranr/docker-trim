@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Homebrew formula is written to `Formula/`.** goreleaser put it at the tap's root,
+  where modern Homebrew no longer looks, so `brew install mkamranr/tap/dtrim` reported no
+  such formula even though the release had published one. The 0.5.1 formula was moved into
+  place by hand; releases from here on write there directly.
+
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose

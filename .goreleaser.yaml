@@ -50,6 +50,10 @@ release:
 
 brews:
   - name: dtrim
+    # Homebrew stopped discovering formulae at a tap's root, so without this
+    # goreleaser writes a dtrim.rb that `brew install` cannot see, and the
+    # release looks like it worked.
+    directory: Formula
     repository:
       owner: mkamranr
       name: homebrew-tap
