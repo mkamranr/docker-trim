@@ -46,7 +46,14 @@ func buildImage(t *testing.T, tag, dockerfile string) {
 func TestProcTracer_sees_binaries_and_dynamically_loaded_libraries(t *testing.T) {
 	ctx := requireDocker(t)
 	const tag = "dtrim-trace-it:python"
-	buildImage(t, tag, "FROM python:3.12-slim\nCMD [\"python\",\"-c\",\"import json,ssl,sqlite3;print('ok')\"]\n")
+	// The import has to stay resident long enough to be sampled. A command that
+	// imports and exits immediately is a coin flip: on a fast runner the whole
+	// dlopen phase can fall between two samples, which is the limitation
+	// docs/tracing.md documents rather than a bug to assert away. Holding the
+	// modules open tests the capability without racing, and is what a real
+	// workload looks like anyway.
+	buildImage(t, tag, "FROM python:3.12-slim\n"+
+		"CMD [\"python\",\"-c\",\"import json,ssl,sqlite3,time;print('ok');time.sleep(2)\"]\n")
 
 	tr, err := tracer.New(tracer.BackendProc)
 	if err != nil {
@@ -75,13 +82,14 @@ func TestProcTracer_sees_binaries_and_dynamically_loaded_libraries(t *testing.T)
 			t.Errorf("the trace missed %q; it saw:\n%s", want, joined)
 		}
 	}
-	// Modules loaded on demand are the interesting case, and the racy one: a
-	// process this short can finish importing before the next sample. Requiring
-	// a specific module here would be a flaky test, so require that dlopen is
-	// observed at all and let the sampling limitation be documented rather than
-	// asserted away. See TestProcTracer_reports_how_long_the_command_ran.
-	if !strings.Contains(joined, "lib-dynload") {
-		t.Errorf("no dynamically loaded module was observed at all:\n%s", joined)
+	// Modules loaded on demand are the interesting case: nothing in the
+	// Dockerfile mentions them, so only running the container reveals them.
+	// They stay mapped for the two seconds this command sleeps, so every sample
+	// sees them.
+	for _, want := range []string{"_ssl", "_sqlite3"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("the trace missed the dynamically loaded %q; it saw:\n%s", want, joined)
+		}
 	}
 	if len(res.Manifest.UsedBinaries) == 0 {
 		t.Error("no binary was recorded")

@@ -88,7 +88,9 @@ run 6:  8 modules   _sqlite3 missed
 
 The command lives about forty milliseconds. A module imported near the end of it can finish
 loading between two samples and appear in none of them. Shortening the interval does not
-fix this: at 2ms the same set came back.
+fix this: at 2ms the same set came back. On a faster machine it gets worse — the same trace
+on a GitHub Actions runner observed **no** dynamically loaded module at all, because the
+entire import phase fell between two samples.
 
 What is reliable is anything mapped for the life of the process, which is the interpreter,
 every library it links against, and every long-lived worker. That is also what accounts for
