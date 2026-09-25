@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--tracer`'s help text no longer says ptrace is planned.** It shipped in 0.3.0 while the
+  flag description still described it as future work. The test meant to catch this only
+  required the word "planned" to appear on the line, which "ptrace and ebpf are planned"
+  satisfied; it now checks that ptrace is not among the ones described as planned.
+
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose

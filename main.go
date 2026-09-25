@@ -140,7 +140,7 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	fl.BoolVar(&f.optimize, "optimize", false, "Rewrite the Dockerfile and write the result to --output")
 	fl.BoolVar(&f.verify, "verify", false, "Build both Dockerfiles and report measured sizes, then start the trimmed image")
 	fl.StringVar(&f.aggressiveness, "aggressiveness", "likely", "How much to change: safe, likely, aggressive")
-	fl.StringVar(&f.tracer, "tracer", "none", "Runtime tracing backend: none, proc (ptrace and ebpf are planned)")
+	fl.StringVar(&f.tracer, "tracer", "none", "Runtime tracing backend: none, proc (no privileges), ptrace (exact; ebpf is planned)")
 	fl.DurationVar(&f.traceTimeout, "trace-timeout", 30*time.Second, "How long to let a traced container run")
 	fl.BoolVar(&f.osv, "osv", false, "Look up real CVEs from api.osv.dev (not implemented yet)")
 	fl.StringVar(&f.buildContext, "context", "", "Build context directory (default: the Dockerfile's directory)")

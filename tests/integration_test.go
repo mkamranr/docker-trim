@@ -294,8 +294,19 @@ func TestHelp_describes_what_is_actually_built(t *testing.T) {
 	if line := helpFor("--osv"); !strings.Contains(line, "not implemented") {
 		t.Errorf("--osv is not built, so its help should say so: %q", line)
 	}
-	if line := helpFor("--tracer"); !strings.Contains(line, "planned") {
-		t.Errorf("--tracer help should name which backends are still planned: %q", line)
+	// Naming every backend keeps this honest in both directions: the help has
+	// to offer the ones that work and not imply the working ones are future
+	// work. The previous version of this test only required the word "planned"
+	// somewhere on the line, so "ptrace and ebpf are planned" kept passing for
+	// a release after ptrace shipped.
+	tracerHelp := helpFor("--tracer")
+	for _, backend := range []string{"proc", "ptrace", "ebpf"} {
+		if !strings.Contains(tracerHelp, backend) {
+			t.Errorf("--tracer help does not mention %s: %q", backend, tracerHelp)
+		}
+	}
+	if i, j := strings.Index(tracerHelp, "ptrace"), strings.Index(tracerHelp, "planned"); i >= 0 && j >= 0 && i > j {
+		t.Errorf("--tracer help describes ptrace as planned, but it is implemented: %q", tracerHelp)
 	}
 	// --trace works now, so its help must no longer claim otherwise.
 	if line := helpFor("--trace"); strings.Contains(line, "planned") ||
