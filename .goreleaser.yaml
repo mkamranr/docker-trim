@@ -42,6 +42,11 @@ release:
     owner: mkamranr
     name: dtrim
   draft: false
+  # Re-running a release has to work. Without this, goreleaser refuses to
+  # overwrite assets it already uploaded and the whole run fails with
+  # "already_exists", which is exactly what happens when the first attempt was
+  # missing a secret and you fix it and try again.
+  mode: replace
 
 brews:
   - name: dtrim
