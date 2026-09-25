@@ -127,6 +127,29 @@ It also knows when to do nothing. A Dockerfile that already builds in stages is 
 because the author has already made those decisions. A build it cannot identify does not
 get a builder stage invented for it.
 
+### How often does the rewrite apply?
+
+Against 66 real Dockerfiles — 24 from projects like Grafana, Airflow, Immich and the official
+images, the rest from one developer's machine — dtrim restructured **23%** of them. The other
+three quarters it declined, and the reasons matter more than the number:
+
+| | |
+| --: | :--- |
+| 50% | already build in multiple stages, so there is nothing to restructure |
+| 17% | build nothing at all: they copy a binary that CI produced and package it |
+| 9% | would land on the same base they started from, saving nothing |
+| 23% | **restructured** |
+
+So the multi-stage rewrite is the right answer for roughly one Dockerfile in four. For the
+other three, dtrim is a linter and an analyser: it still applies the cleanups, reports where
+an image's bytes and attack surface come from, and with `--tracer` tells you which installed
+packages nothing ever touches.
+
+That corpus is small and skewed — two thirds of it is one person's projects, which makes it
+Python-heavy. Reproduce it with `scripts/fetch-corpus.sh` and check your own numbers. What
+did hold across all 66 files, at every base, was the part that matters: no crashes, no
+unparseable output, and no file changed when dtrim had nothing to change.
+
 ## Measured reduction
 
 Three sample projects live in [`tests/projects`](tests/projects). `make integration` builds

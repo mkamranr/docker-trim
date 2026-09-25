@@ -3,6 +3,11 @@
 /dist/
 /bin/
 
+# Real Dockerfiles fetched for the corpus survey. They belong to their own
+# projects, and pinning a snapshot would freeze a corpus that stops being
+# representative. Rebuild with scripts/fetch-corpus.sh.
+/tests/corpus/
+
 # Test artifacts
 /tests/fixtures/generated/
 *.out

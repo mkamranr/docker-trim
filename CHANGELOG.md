@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A corpus survey** (`scripts/fetch-corpus.sh` and `tests/corpus_test.go`). The rest of the
+  suite runs against fixtures this project wrote, which only contains shapes dtrim was
+  designed for. This runs the same guarantees against Dockerfiles written by other people.
+
+  Across 66 real files at all three bases, 195 rewrites in total: no panics, no unparseable
+  output, and no file altered when dtrim had nothing to change. The two properties the README
+  claims survive contact with strangers' Dockerfiles.
+
+  It also measured what the rewrite actually applies to, which was less than the README
+  implied: **23% restructured**, while 50% already build in stages, 17% build nothing at all
+  and only package a binary CI produced, and 9% would land on the base they started from. The
+  README now states this, along with the corpus's own bias.
+
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
