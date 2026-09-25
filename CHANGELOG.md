@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Planned
+
+- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
+  kernel exposes BTF.
+- **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
+  builds, and use `trivy` or `grype` automatically when either is on `PATH`.
+- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
+  reporting that Debian and Alpine images already get.
+- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.4.0] - 2026-09-25
+
 ### Added
 
 - **The tracer now informs the rewrite.** They were two halves that did not talk: dtrim could
@@ -33,15 +45,15 @@ All notable changes to this project are documented here. The format follows
   so trace data can reach it. A library caller passing `(a, base, confidence)` becomes
   `(a, synthesizer.Options{Base: base, Aggressiveness: confidence})`.
 
-### Planned
+### Known limitations
 
-- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
-  kernel exposes BTF.
-- **Real CVE counts** (`--osv`). Query api.osv.dev from the package inventory dtrim already
-  builds, and use `trivy` or `grype` automatically when either is on `PATH`.
-- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
-  reporting that Debian and Alpine images already get.
-- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+- **Runtime gaps are only as good as the workload.** dtrim can only warn about a binary it
+  saw run. A code path the trace never reached can still shell out to something the new base
+  lacks, so `--trace` with a representative workload matters more here than anywhere else.
+- **`--prune-unused` applies to a narrow case**: the final stage of a file that already builds
+  in stages. Builders and single-stage files are refused, for reasons in
+  `docs/heuristics.md`. Packages pulled in as dependencies, rather than named in the
+  Dockerfile, cannot be dropped this way either.
 
 ## [0.3.1] - 2026-09-25
 
@@ -208,7 +220,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.4.0
 [0.3.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.1
 [0.3.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.0
 [0.2.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.2.0
