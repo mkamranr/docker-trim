@@ -6,13 +6,6 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-### Fixed
-
-- **`--tracer`'s help text no longer says ptrace is planned.** It shipped in 0.3.0 while the
-  flag description still described it as future work. The test meant to catch this only
-  required the word "planned" to appear on the line, which "ptrace and ebpf are planned"
-  satisfied; it now checks that ptrace is not among the ones described as planned.
-
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
@@ -22,6 +15,16 @@ All notable changes to this project are documented here. The format follows
 - **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
   reporting that Debian and Alpine images already get.
 - Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.3.1] - 2026-09-25
+
+### Fixed
+
+- **`--tracer`'s help text no longer says ptrace is planned.** It shipped in 0.3.0 while the
+  flag description still described it as future work, so the binary contradicted its own
+  documentation. The test meant to catch this only required the word "planned" to appear on
+  the line, which "ptrace and ebpf are planned" satisfied; it now requires every backend to
+  be named and checks that ptrace is not among the ones called planned.
 
 ## [0.3.0] - 2026-09-25
 
@@ -178,7 +181,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.1
 [0.3.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.0
 [0.2.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.2.0
 [0.1.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.1.0
