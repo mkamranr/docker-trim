@@ -13,9 +13,11 @@ All notable changes to this project are documented here. The format follows
   path, the container image, the Homebrew formula, the release archives and the
   `DOCKER_TRIM_VERSION` / `DOCKER_TRIM_BIN_DIR` environment variables.
 
-  GitHub redirects the old repository URL, and `go install` follows that redirect, so nothing
-  breaks outright. Anyone with the old binary should reinstall; `brew install
-  mkamranr/tap/docker-trim` replaces `brew install mkamranr/tap/dtrim`.
+  GitHub redirects the old repository URL, and the Go module proxy keeps serving the releases
+  published under the old path, so `go install github.com/mkamranr/dtrim@v0.7.0` and earlier
+  keep working. Releases from 0.8.0 live at `github.com/mkamranr/docker-trim`. Anyone with the
+  old binary should reinstall; `brew install mkamranr/tap/docker-trim` replaces
+  `brew install mkamranr/tap/dtrim`.
 
   The Go library package is `pkg/trim`, imported as `github.com/mkamranr/docker-trim/pkg/trim`,
   because a Go package name cannot contain a hyphen and `trim.Run` reads better than the
