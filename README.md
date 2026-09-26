@@ -109,7 +109,7 @@ where the binary lands.
 | `curl`, `wget`, `nc`, `git`, `gcc`, `sudo` in the final image | Reports each one and what it gives an attacker; the runtime stage leaves them behind |
 | A credential-shaped `ENV` or `ARG` | Reports it: every layer keeps it, so `docker history` reveals it |
 | A running container (`--tracer`) | Runs it and records what it actually touches, then attributes those files back to the packages that installed them, so you can see what was never used. `proc` samples `/proc` and needs no privileges; `ptrace` observes every syscall and misses nothing |
-| A built image, with `--osv` | Looks every installed package up at osv.dev and reports what is known to affect it, scored from the advisory's own CVSS vector. Those become findings, so `--fail-on critical` refuses a build over them |
+| A built image, with `--osv` | Looks up every installed package at osv.dev — operating-system packages **and** the application's own PyPI and npm dependencies — and reports what is known to affect it, scored from the advisory's own CVSS vector. Those become findings, so `--fail-on critical` refuses a build over them |
 | A built image | Streams its layers and reports where the bytes went: caches, docs, locales, bytecode, files written then overwritten, files deleted but still shipped |
 
 When a trace is available, it also checks its own work. A Go service that shells out, rewritten

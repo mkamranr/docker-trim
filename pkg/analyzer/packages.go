@@ -3,6 +3,7 @@ package analyzer
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"path"
 	"sort"
@@ -29,7 +30,23 @@ type packageDB struct {
 	wantFiles bool
 	// release is /etc/os-release, which names the distribution and version.
 	release []byte
+
+	// Language packages, which unlike the OS databases arrive as one small
+	// file per package rather than a handful of large ones.
+	langPackages  []langPackage
+	langIndex     map[string]int
+	langBytes     int64
+	langTruncated bool
+	// wantLanguage turns the language inventory on. It is on by default; the
+	// flag exists so a caller that only wants OS packages does not pay for
+	// reading thousands of small files.
+	wantLanguage bool
 }
+
+// readerFunc is the tar entry body. It is a function rather than an io.Reader
+// so a handler that decides not to read simply never calls it, leaving the
+// shared tar reader positioned for the caller.
+type readerFunc = io.Reader
 
 const (
 	dpkgStatusPath = "/var/lib/dpkg/status"
@@ -45,11 +62,27 @@ const (
 )
 
 func newPackageDB(wantFiles bool) *packageDB {
-	d := &packageDB{wantFiles: wantFiles}
+	d := &packageDB{wantFiles: wantFiles, wantLanguage: true}
 	if wantFiles {
 		d.dpkgFiles = map[string][]byte{}
 	}
 	return d
+}
+
+// budgetedRead reads a language metadata file, refusing once the inventory has
+// consumed its share of memory.
+//
+// The OS databases are a few files and are capped individually. This path can
+// see thousands, so it needs a running total: one real node_modules on a
+// developer machine holds 837 package.json files across 34 nested trees.
+func (d *packageDB) budgetedRead(r readerFunc) []byte {
+	if d.langBytes >= maxLangBytes {
+		d.langTruncated = true
+		return nil
+	}
+	body := readCapped(r)
+	d.langBytes += int64(len(body))
+	return body
 }
 
 // maybeCapture reads the file body when the path is a package database. A
@@ -65,6 +98,8 @@ func (d *packageDB) maybeCapture(p string, r io.Reader) {
 		if body := readCapped(r); len(body) > 0 {
 			d.release = body
 		}
+	case d.wantLanguage && d.captureLanguage(p, r):
+		// Handled: a PyPI or npm package was recorded.
 	case strings.HasPrefix(p, "/var/lib/rpm/"):
 		d.sawRPM = true
 	case d.wantFiles && strings.HasPrefix(p, dpkgInfoDir) && strings.HasSuffix(p, ".list"):
@@ -90,23 +125,38 @@ func readCapped(r io.Reader) []byte {
 func (d *packageDB) parse() (manager string, pkgs []Package, notes []string) {
 	switch {
 	case len(d.dpkgStatus) > 0:
+		manager = "dpkg"
 		pkgs = parseDpkgStatus(d.dpkgStatus)
 		if d.wantFiles {
 			attachDpkgFiles(pkgs, d.dpkgFiles)
 		}
-		return "dpkg", pkgs, nil
 	case len(d.apkDB) > 0:
+		manager = "apk"
 		pkgs = parseApkInstalled(d.apkDB)
 		if d.wantFiles {
 			attachApkFiles(pkgs, d.apkDB)
 		}
-		return "apk", pkgs, nil
 	case d.sawRPM:
-		return "rpm", nil, []string{
-			"This image uses rpm, whose database dtrim cannot read yet, so no package " +
-				"inventory is available. Size and layer analysis are unaffected."}
+		manager = "rpm"
+		notes = append(notes,
+			"This image uses rpm, whose database dtrim cannot read yet, so no operating-system "+
+				"package inventory is available. Size, layer and language analysis are unaffected.")
+	default:
+		manager = "none"
 	}
-	return "none", nil, nil
+
+	// Language packages sit alongside the OS ones rather than replacing them,
+	// and an image can perfectly well have both, or only one.
+	if lang := d.languagePackages(); len(lang) > 0 {
+		pkgs = append(pkgs, lang...)
+	}
+	if d.langTruncated {
+		notes = append(notes, fmt.Sprintf(
+			"The language package inventory stopped at %d packages or %d MB, so it is "+
+				"incomplete and any count derived from it is a floor.",
+			maxLangPackages, maxLangBytes>>20))
+	}
+	return manager, pkgs, notes
 }
 
 // osRelease reads the distribution id, pretty name and version out of

@@ -308,6 +308,7 @@ func writeSummary(b *strings.Builder, p palette, rep *dtrim.Report) {
 	}
 	if v := rep.Vulnerabilities; v != nil {
 		fmt.Fprintf(b, "Vulnerabilities     : %s\n", vulnSummary(p, v))
+		writeEcosystems(b, p, v)
 	}
 	fmt.Fprintf(b, "%s\n", p.dim(rule))
 }
@@ -385,6 +386,7 @@ func vulnSummary(p palette, v *security.VulnerabilityReport) string {
 	if v.Total == 0 {
 		return p.good("none known") + " " + p.dim(fmt.Sprintf("(%d packages checked against OSV)", v.Queried))
 	}
+	_ = v.Ecosystems
 	var parts []string
 	for _, band := range []string{"critical", "high", "medium", "low", "unknown"} {
 		if n := v.BySeverity[band]; n > 0 {
@@ -401,6 +403,49 @@ func vulnSummary(p palette, v *security.VulnerabilityReport) string {
 		}
 	}
 	return fmt.Sprintf("%d in %d packages  %s", v.Total, v.Queried, strings.Join(parts, ", "))
+}
+
+// writeEcosystems breaks the vulnerability count down by where the packages
+// came from.
+//
+// Conflating them hides what matters: a handful of unreachable advisories in a
+// slim base image reads very differently from the same number in the
+// application's own dependency tree. The install root is shown for the same
+// reason, since a Node base image carries hundreds of npm packages of its own.
+func writeEcosystems(b *strings.Builder, p palette, v *security.VulnerabilityReport) {
+	if len(v.Ecosystems) < 2 && len(v.Ecosystems) > 0 && len(v.Ecosystems[0].Roots) < 2 {
+		return // one ecosystem in one place: the summary line said it all
+	}
+	for _, e := range v.Ecosystems {
+		count := p.dim("none")
+		if e.Total > 0 {
+			count = fmt.Sprintf("%d", e.Total)
+		}
+		fmt.Fprintf(b, "  %-18s: %s in %d %s\n",
+			e.Ecosystem, count, e.Queried, plural("package", e.Queried))
+		for _, root := range sortedRoots(e.Roots) {
+			fmt.Fprintf(b, "      %s\n",
+				p.dim(fmt.Sprintf("%d under %s", e.Roots[root], root)))
+		}
+	}
+}
+
+// sortedRoots orders install roots by how many packages each holds.
+func sortedRoots(roots map[string]int) []string {
+	if len(roots) < 2 {
+		return nil // a single root tells the reader nothing they need
+	}
+	out := make([]string, 0, len(roots))
+	for r := range roots {
+		out = append(out, r)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if roots[out[i]] != roots[out[j]] {
+			return roots[out[i]] > roots[out[j]]
+		}
+		return out[i] < out[j]
+	})
+	return out
 }
 
 func baseOf(rep *dtrim.Report, original bool) string {

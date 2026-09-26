@@ -162,3 +162,26 @@ func TestPrune_output_is_stable(t *testing.T) {
 		t.Errorf("a second pass changed the file:\n--- first ---\n%s\n--- second ---\n%s", first, second)
 	}
 }
+
+// Belt and braces for the same collision, one layer down: even if a language
+// package reached Unused, it must not strip a real OS package from an install.
+func TestPrune_ignores_language_packages(t *testing.T) {
+	usage := &analyzer.Usage{Unused: []analyzer.Package{
+		{Name: "curl", SizeBytes: 1 << 20},
+		{Name: "vim", Version: "9.0", Ecosystem: "PyPI", SizeBytes: 1 << 20},
+	}}
+	res, out := optimizeString(t, multiStageSrc, Options{
+		Base:           BaseDistroless,
+		Aggressiveness: analyzer.ConfidenceLikely,
+		PruneUnused:    true,
+		Usage:          usage,
+	})
+
+	if len(res.Pruned) != 1 || res.Pruned[0] != "curl" {
+		t.Errorf("pruned = %v, want curl only: vim came from a lockfile", res.Pruned)
+	}
+	_, runtime, _ := strings.Cut(out, "FROM debian:12")
+	if !strings.Contains(runtime, "vim") {
+		t.Errorf("the OS vim was stripped on evidence about a PyPI package:\n%s", runtime)
+	}
+}

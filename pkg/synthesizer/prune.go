@@ -39,7 +39,13 @@ func pruneUnused(a *analyzer.Analysis, opts Options) []string {
 
 	removable := map[string]bool{}
 	for _, p := range opts.Usage.Unused {
-		removable[p.Name] = true
+		// Belt and braces: AttributeUsage already keeps language packages out
+		// of Unused, and it matters enough to check here too. A PyPI package
+		// sharing a name with an OS one would otherwise be stripped from an
+		// apt-get install line on evidence about something else entirely.
+		if p.IsOS() {
+			removable[p.Name] = true
+		}
 	}
 	if len(removable) == 0 {
 		return nil

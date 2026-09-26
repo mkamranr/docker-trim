@@ -14,7 +14,11 @@ import (
 
 // SchemaVersion is the version of the JSON report. It changes only when an
 // existing field changes meaning or disappears, so a consumer can pin to it.
-const SchemaVersion = 1
+//
+// 2: vulnerabilities.ecosystem, a single string, became vulnerabilities.
+// ecosystems, a list, because an image holds packages from several at once.
+// Everything else is additive.
+const SchemaVersion = 2
 
 // Report is everything a run produced. It is what --quiet serialises and what
 // the terminal reporter renders.

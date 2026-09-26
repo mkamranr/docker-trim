@@ -21,6 +21,10 @@ type Usage struct {
 	// RemovableBytes is what the unused packages report as their installed
 	// size. It is the package database's own figure, not a measurement.
 	RemovableBytes int64 `json:"removableBytes"`
+	// LanguagePackages counts the PyPI and npm packages in the image, which are
+	// reported and scanned for vulnerabilities but never classified as
+	// removable: dtrim edits Dockerfiles, and those arrive through a lockfile.
+	LanguagePackages int `json:"languagePackages,omitempty"`
 	// Notes record anything that limits how far this should be trusted.
 	Notes []string `json:"notes,omitempty"`
 }
@@ -66,9 +70,27 @@ func AttributeUsage(rep *ImageReport, manifest TraceManifest) Usage {
 		return u
 	}
 
+	// Only operating-system packages take part. A Python or npm package
+	// arrives through requirements.txt or a lockfile, so dtrim could not remove
+	// it by editing a Dockerfile even if a trace proved nothing used it, and
+	// listing it as removable would be an instruction nobody can follow.
+	//
+	// Worse, such a package has no file list, so it could never appear as used
+	// and would land in Unused unconditionally: it would inflate the removable
+	// total, and a name shared with an OS package could get that real package
+	// stripped from an apt-get install line.
+	var osPackages []Package
+	for _, p := range rep.Packages {
+		if p.IsOS() {
+			osPackages = append(osPackages, p)
+		} else {
+			u.LanguagePackages++
+		}
+	}
+
 	// One pass to build the reverse index: a path to the package owning it.
 	owner := make(map[string]string, 1<<14)
-	for _, p := range rep.Packages {
+	for _, p := range osPackages {
 		for _, f := range p.Files {
 			owner[f] = p.Name
 		}
@@ -92,7 +114,7 @@ func AttributeUsage(rep *ImageReport, manifest TraceManifest) Usage {
 	sort.Strings(unowned)
 	u.UnownedFiles = unowned
 
-	for _, p := range rep.Packages {
+	for _, p := range osPackages {
 		switch {
 		case touched[p.Name]:
 			u.Used = append(u.Used, p)

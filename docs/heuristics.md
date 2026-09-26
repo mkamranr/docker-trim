@@ -140,6 +140,12 @@ case where dtrim otherwise says "I left the structure alone". Pair it with `--ve
   needs, and only you know that.
 - **It does not pin your base image.** A floating tag is reported. Choosing the digest is a
   decision about your supply chain, not a formatting fix.
+- **It does not treat a Python or npm package as removable, ever.** They are inventoried and
+  scanned, but never appear in the "never touched" list and never reach `--prune-unused`.
+  dtrim edits Dockerfiles, and those packages arrive through a lockfile, so a suggestion to
+  remove one is an instruction nobody can follow. It also avoids a real hazard: a PyPI
+  package sharing a name with an OS one could otherwise get that OS package stripped from an
+  `apt-get install` line on evidence about something else entirely.
 - **It does not remove packages unless you ask.** A trace reports what went unused;
   `--prune-unused` acts on it, and without that flag dtrim deletes nothing. A trace only
   covers the code paths you exercised, and the package that goes unused all week is the one

@@ -254,3 +254,58 @@ func TestPathAliases(t *testing.T) {
 		}
 	}
 }
+
+// The regression this feature could most easily cause.
+//
+// A language package has no file list, so it can never appear as used. Left in
+// the classification it would land in Unused unconditionally, inflate the
+// removable total, and tell the user to delete something dtrim cannot remove
+// by editing a Dockerfile.
+func TestAttributeUsage_never_calls_a_language_package_removable(t *testing.T) {
+	rep := imageWith(
+		Package{Name: "python3", SizeBytes: 10 << 20, Files: []string{"/usr/bin/python3"}},
+		Package{Name: "vim", SizeBytes: 40 << 20, Files: []string{"/usr/bin/vim"}},
+		// These arrive through requirements.txt and a lockfile.
+		Package{Name: "flask", Version: "3.1.0", Ecosystem: "PyPI", SizeBytes: 5 << 20},
+		Package{Name: "express", Version: "4.21.2", Ecosystem: "npm", SizeBytes: 3 << 20},
+	)
+	u := AttributeUsage(rep, TraceManifest{UsedBinaries: []string{"/usr/bin/python3"}})
+
+	for _, bucket := range [][]Package{u.Used, u.Unused, u.Essential} {
+		for _, p := range bucket {
+			if !p.IsOS() {
+				t.Errorf("%s (%s) was classified for removal; dtrim cannot remove it",
+					p.Name, p.Ecosystem)
+			}
+		}
+	}
+	if got := names(u.Unused); got != "vim" {
+		t.Errorf("unused = %q, want vim only", got)
+	}
+	// Their size must not be counted as recoverable either.
+	if u.RemovableBytes != 40<<20 {
+		t.Errorf("removable = %d bytes, want only vim's 40MB", u.RemovableBytes)
+	}
+	if u.LanguagePackages != 2 {
+		t.Errorf("language packages = %d, want 2 reported separately", u.LanguagePackages)
+	}
+}
+
+// The dangerous shape: a PyPI package sharing a name with an OS one. If the
+// language package reached the removable set, the OS package would be stripped
+// from an apt-get install line on evidence about something else entirely.
+func TestAttributeUsage_name_collision_cannot_remove_an_os_package(t *testing.T) {
+	rep := imageWith(
+		Package{Name: "click", SizeBytes: 1 << 20, Files: []string{"/usr/bin/click"}},
+		Package{Name: "click", Version: "8.1.7", Ecosystem: "PyPI", SizeBytes: 2 << 20},
+	)
+	// The trace used the OS binary, so the OS package is in use.
+	u := AttributeUsage(rep, TraceManifest{UsedBinaries: []string{"/usr/bin/click"}})
+
+	if got := names(u.Unused); got != "" {
+		t.Errorf("unused = %q, want nothing: the OS click was used and the PyPI one is not removable", got)
+	}
+	if got := names(u.Used); got != "click" {
+		t.Errorf("used = %q, want the OS click once", got)
+	}
+}

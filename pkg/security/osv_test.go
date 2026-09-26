@@ -6,17 +6,53 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/mkamranr/dtrim/pkg/analyzer"
 )
 
-// fakeOSV stands in for api.osv.dev. Pointing the tests at a real service would
-// make them fail when that service is slow, and make the suite depend on
-// vulnerability data that changes daily.
+// fakeOSV stands in for api.osv.dev, serving both the batch triage and the
+// per-package detail endpoint.
+//
+// Pointing the tests at the real service would make them fail when it is slow,
+// and make the suite depend on vulnerability data that changes daily.
 func fakeOSV(t *testing.T, reply map[string]string) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	// Triage: which of these packages has any advisory at all. The reply is
+	// positional, matching the real API.
+	mux.HandleFunc("/v1/querybatch", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Queries []struct {
+				Package struct{ Name, Ecosystem string }
+				Version string
+			}
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		results := make([]map[string]any, 0, len(req.Queries))
+		for _, q := range req.Queries {
+			var ids []map[string]string
+			if body, ok := reply[q.Package.Name]; ok {
+				var parsed struct {
+					Vulns []struct{ ID string }
+				}
+				_ = json.Unmarshal([]byte(body), &parsed)
+				for _, v := range parsed.Vulns {
+					ids = append(ids, map[string]string{"id": v.ID})
+				}
+			}
+			results = append(results, map[string]any{"vulns": ids})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
+	})
+
+	// Detail: everything known about one package, including CVSS.
+	mux.HandleFunc("/v1/query", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Package struct{ Name, Ecosystem string }
 			Version string
@@ -30,11 +66,20 @@ func fakeOSV(t *testing.T, reply map[string]string) *httptest.Server {
 			body = `{"vulns":[]}`
 		}
 		_, _ = w.Write([]byte(body))
-	}))
-	old := osvEndpoint
-	osvEndpoint = srv.URL
-	t.Cleanup(func() { osvEndpoint = old; srv.Close() })
+	})
+
+	srv := httptest.NewServer(mux)
+	pointAt(t, srv.URL)
+	t.Cleanup(srv.Close)
 	return srv
+}
+
+// pointAt redirects both OSV endpoints at a test server.
+func pointAt(t *testing.T, base string) {
+	t.Helper()
+	oldQuery, oldBatch := osvEndpoint, osvBatchEndpoint
+	osvEndpoint, osvBatchEndpoint = base+"/v1/query", base+"/v1/querybatch"
+	t.Cleanup(func() { osvEndpoint, osvBatchEndpoint = oldQuery, oldBatch })
 }
 
 func debianImage(pkgs ...analyzer.Package) *analyzer.ImageReport {
@@ -135,9 +180,8 @@ func TestQueryOSV_fails_loudly_when_every_lookup_fails(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	old := osvEndpoint
-	osvEndpoint = srv.URL
-	t.Cleanup(func() { osvEndpoint = old; srv.Close() })
+	pointAt(t, srv.URL)
+	t.Cleanup(srv.Close)
 
 	_, err := QueryOSV(context.Background(), debianImage(
 		analyzer.Package{Name: "a", Version: "1"},
@@ -150,19 +194,34 @@ func TestQueryOSV_fails_loudly_when_every_lookup_fails(t *testing.T) {
 // A partial failure is a floor, and the report has to say so rather than
 // presenting an undercount as a total.
 func TestQueryOSV_says_when_a_count_is_only_a_floor(t *testing.T) {
+	const vuln = `{"vulns":[{"id":"X","severity":[{"type":"CVSS_V3",
+		"score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}]}`
+
+	mux := http.NewServeMux()
+	// Triage says every package is affected, so the detail phase has work.
+	mux.HandleFunc("/v1/querybatch", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Queries []json.RawMessage }
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		results := make([]map[string]any, len(req.Queries))
+		for i := range results {
+			results[i] = map[string]any{"vulns": []map[string]string{{"id": "X"}}}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
+	})
+	// Half the detail lookups fail.
 	var n int
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/v1/query", func(w http.ResponseWriter, _ *http.Request) {
 		n++
 		if n%2 == 0 {
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
-		_, _ = w.Write([]byte(`{"vulns":[{"id":"X","severity":[{"type":"CVSS_V3",
-			"score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}]}`))
-	}))
-	old := osvEndpoint
-	osvEndpoint = srv.URL
-	t.Cleanup(func() { osvEndpoint = old; srv.Close() })
+		_, _ = w.Write([]byte(vuln))
+	})
+
+	srv := httptest.NewServer(mux)
+	pointAt(t, srv.URL)
+	t.Cleanup(srv.Close)
 
 	rep, err := QueryOSV(context.Background(), debianImage(
 		analyzer.Package{Name: "a", Version: "1"},
@@ -210,5 +269,109 @@ func TestOSVEcosystem(t *testing.T) {
 		if got != c.want {
 			t.Errorf("OSVEcosystem(%q,%q) = %q, want %q", c.id, c.version, got, c.want)
 		}
+	}
+}
+
+// Each package is looked up in its own ecosystem: a PyPI package in Debian's
+// returns nothing, which is indistinguishable from being unaffected.
+func TestQueryOSV_looks_each_package_up_in_its_own_ecosystem(t *testing.T) {
+	var (
+		mu   sync.Mutex
+		seen = map[string]string{} // package -> ecosystem it was queried in
+	)
+	mux := http.NewServeMux()
+	record := func(name, eco string) {
+		mu.Lock()
+		defer mu.Unlock()
+		seen[name] = eco
+	}
+	mux.HandleFunc("/v1/querybatch", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Queries []struct {
+				Package struct{ Name, Ecosystem string }
+				Version string
+			}
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		results := make([]map[string]any, 0, len(req.Queries))
+		for _, q := range req.Queries {
+			record(q.Package.Name, q.Package.Ecosystem)
+			results = append(results, map[string]any{
+				"vulns": []map[string]string{{"id": "ADV-" + q.Package.Name}},
+			})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
+	})
+	mux.HandleFunc("/v1/query", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Package struct{ Name, Ecosystem string }
+			Version string
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		record(req.Package.Name, req.Package.Ecosystem)
+		_, _ = w.Write([]byte(`{"vulns":[{"id":"ADV-` + req.Package.Name + `","severity":[{"type":"CVSS_V3",` +
+			`"score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}]}`))
+	})
+	srv := httptest.NewServer(mux)
+	pointAt(t, srv.URL)
+	t.Cleanup(srv.Close)
+
+	rep, err := QueryOSV(context.Background(), debianImage(
+		analyzer.Package{Name: "curl", Version: "7.88.1"},
+		analyzer.Package{Name: "flask", Version: "3.1.0", Ecosystem: "PyPI", Root: "/usr/lib/python3/site-packages"},
+		analyzer.Package{Name: "express", Version: "4.21.2", Ecosystem: "npm", Root: "/app/node_modules"},
+	), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{"curl": "Debian:12", "flask": "PyPI", "express": "npm"}
+	for name, eco := range want {
+		if seen[name] != eco {
+			t.Errorf("%s was looked up in %q, want %q", name, seen[name], eco)
+		}
+	}
+	if rep.Total != 3 {
+		t.Errorf("total = %d, want 3", rep.Total)
+	}
+	// And the report keeps them apart.
+	byEco := map[string]EcosystemReport{}
+	for _, e := range rep.Ecosystems {
+		byEco[e.Ecosystem] = e
+	}
+	if len(byEco) != 3 {
+		t.Fatalf("ecosystems = %+v, want three", rep.Ecosystems)
+	}
+	if got := byEco["npm"].Roots["/app/node_modules"]; got != 1 {
+		t.Errorf("npm roots = %v, want the install root recorded", byEco["npm"].Roots)
+	}
+}
+
+// An unfamiliar distribution must not stop the language packages being
+// scanned: reporting nothing because the base was unusual is the wrong silence.
+func TestQueryOSV_scans_language_packages_on_an_unknown_distro(t *testing.T) {
+	fakeOSV(t, map[string]string{
+		"flask": `{"vulns":[{"id":"PYSEC-1","severity":[{"type":"CVSS_V3",
+			"score":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}]}`,
+	})
+
+	rep, err := QueryOSV(context.Background(), &analyzer.ImageReport{
+		Reference: "test:latest", OSID: "gentoo", // not supported
+		Packages: []analyzer.Package{
+			{Name: "glibc", Version: "2.39"},
+			{Name: "flask", Version: "3.1.0", Ecosystem: "PyPI"},
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("an unknown distro stopped the whole scan: %v", err)
+	}
+	if rep.Total != 1 {
+		t.Errorf("total = %d, want the PyPI advisory", rep.Total)
+	}
+	if rep.Queried != 1 {
+		t.Errorf("queried = %d, want only the package with a known ecosystem", rep.Queried)
+	}
+	if len(rep.Notes) == 0 || !strings.Contains(strings.Join(rep.Notes, " "), "not looked up") {
+		t.Errorf("the skipped OS packages were not disclosed: %v", rep.Notes)
 	}
 }

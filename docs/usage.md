@@ -164,10 +164,22 @@ Pair it with `--verify`, which builds the result and starts it.
 Look up every installed package at [osv.dev](https://osv.dev) and report what is known to
 affect it. Needs `--image`, since it reads a built image's package inventory.
 
+This covers **operating-system packages and the application's own dependencies** — PyPI and
+npm — because that is where exploitable vulnerabilities concentrate. A slim base image's
+advisories are often low severity and unreachable; a three-year-old Django is not.
+
 ```console
 $ dtrim --analyze-only --image myapp:latest --osv
-Vulnerabilities     : 18 in 87 packages  4 high, 10 medium, 1 low, 3 unknown
+Vulnerabilities     : 63 in 256 packages  26 high, 25 medium, 4 low, 8 unknown
+  npm               : 63 in 238 packages
+      185 under /usr/local/lib/node_modules
+      53 under /app/node_modules
+  Alpine:v3.24      : none in 18 packages
 ```
+
+The ecosystems are kept apart deliberately, and so are the install roots. A `node:22-alpine`
+base ships 185 npm packages inside npm itself; an application that installed three would
+otherwise be told it has 238, which is true and useless.
 
 Advisories become findings, so **`--fail-on` gates on them** without a second threshold:
 

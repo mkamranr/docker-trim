@@ -76,7 +76,10 @@ type FileInfo struct {
 	Layer int    `json:"layer"`
 }
 
-// Package is one installed operating-system package.
+// Package is one installed package.
+//
+// An empty Ecosystem means an operating-system package, which keeps every
+// existing construction site and test correct without change.
 type Package struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -87,7 +90,26 @@ type Package struct {
 	// asked for ownership, which is what a trace needs to attribute a used file
 	// back to the package that put it there.
 	Files []string `json:"-"`
+	// Ecosystem is the OSV ecosystem this package belongs to: "PyPI", "npm",
+	// or empty for an operating-system package, whose ecosystem is a property
+	// of the image rather than the package.
+	Ecosystem string `json:"ecosystem,omitempty"`
+	// Root is the directory a language package was installed into, such as
+	// /app/node_modules or /usr/local/lib/python3.12/site-packages.
+	//
+	// It is what separates the application's own dependencies from the ones
+	// its base image happens to carry. A node:22-alpine image ships 233 npm
+	// packages inside npm itself; an app that installed three would otherwise
+	// be told it has 238, which is true and useless.
+	Root string `json:"root,omitempty"`
 }
+
+// IsOS reports whether this is an operating-system package.
+//
+// Only these can be reasoned about for removal: dtrim edits Dockerfiles, and a
+// Python or npm package arrives through requirements.txt or a lockfile, not
+// through a line dtrim can rewrite.
+func (p Package) IsOS() bool { return p.Ecosystem == "" }
 
 // bloatCategories classify a path by why it did not need to ship. Order
 // matters: the first match wins, so the more specific prefixes come first.

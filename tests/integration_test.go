@@ -150,8 +150,8 @@ func TestQuiet_emits_only_valid_json(t *testing.T) {
 	if err := json.Unmarshal([]byte(r.stdout), &rep); err != nil {
 		t.Fatalf("stdout is not valid JSON: %v\n%s", err, r.stdout)
 	}
-	if rep.SchemaVersion != 1 {
-		t.Errorf("schemaVersion = %d, want 1", rep.SchemaVersion)
+	if rep.SchemaVersion != 2 {
+		t.Errorf("schemaVersion = %d, want 2", rep.SchemaVersion)
 	}
 	if rep.Tool != "dtrim" {
 		t.Errorf("tool = %q", rep.Tool)
