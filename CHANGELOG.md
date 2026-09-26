@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Planned
+
+- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
+  kernel exposes BTF.
+- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
+  ecosystems OSV does not cover and for language dependencies rather than OS packages.
+- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
+  reporting that Debian and Alpine images already get.
+- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.8.0] - 2026-09-26
+
 ### Changed
 
 - **Renamed from `dtrim` to `docker-trim`.** The old name said nothing about what the tool
@@ -29,16 +41,6 @@ All notable changes to this project are documented here. The format follows
   now behaves accordingly: linked into `~/.docker/cli-plugins` it answers to `docker trim`
   with identical flags. Without this, a binary called `docker-trim` placed where its name
   suggests would have been reported by Docker as an invalid plugin.
-
-### Planned
-
-- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
-  kernel exposes BTF.
-- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
-  ecosystems OSV does not cover and for language dependencies rather than OS packages.
-- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
-  reporting that Debian and Alpine images already get.
-- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
 
 ## [0.7.0] - 2026-09-26
 
@@ -432,7 +434,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/docker-trim/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/mkamranr/docker-trim/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.8.0
 [0.7.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.7.0
 [0.6.1]: https://github.com/mkamranr/docker-trim/releases/tag/v0.6.1
 [0.6.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.6.0
