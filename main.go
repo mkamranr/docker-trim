@@ -178,8 +178,11 @@ func commandLine() []string {
 	if os.Getenv("DOCKER_CLI_PLUGIN_ORIGINAL_CLI_COMMAND") == "" {
 		return args
 	}
-	name := strings.TrimPrefix(filepath.Base(os.Args[0]), "docker-")
-	if len(args) > 0 && args[0] == name {
+	// On Windows the plugin is docker-trim.exe, so the extension has to come
+	// off before the name can match what Docker passes.
+	base := filepath.Base(os.Args[0])
+	name := strings.TrimPrefix(strings.TrimSuffix(base, filepath.Ext(base)), "docker-")
+	if name != "" && len(args) > 0 && args[0] == name {
 		return args[1:]
 	}
 	return args

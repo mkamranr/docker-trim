@@ -451,7 +451,9 @@ func TestPluginInvocation_drops_the_subcommand_docker_passes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// As Docker invokes it: the plugin name first, and the marker set.
+	// As Docker invokes it: the plugin name first, and the marker set. The
+	// name Docker passes never carries the .exe that the binary does on
+	// Windows, which is how this first broke there.
 	cmd := exec.Command(binary, "trim", "--no-color", "--analyze-only", "-f", df, "--no-diff")
 	cmd.Env = append(os.Environ(),
 		"DOCKER_CLI_PLUGIN_ORIGINAL_CLI_COMMAND=/usr/local/bin/docker")
