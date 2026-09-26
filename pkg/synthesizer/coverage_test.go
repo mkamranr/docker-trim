@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // The failure this feature exists to prevent: a rewrite that is dramatically

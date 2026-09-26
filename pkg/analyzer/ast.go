@@ -44,7 +44,7 @@ type Analysis struct {
 }
 
 // MultiStage reports whether the file already builds in more than one stage,
-// or copies from an external image. dtrim never restructures such a file: the
+// or copies from an external image. docker-trim never restructures such a file: the
 // author has already made the layering decisions, and guessing at them is how a
 // tool like this breaks someone's build.
 func (a *Analysis) MultiStage() bool {

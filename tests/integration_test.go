@@ -13,16 +13,16 @@ import (
 
 var binary string
 
-// TestMain builds dtrim once and runs every test against that binary, so the
+// TestMain builds docker-trim once and runs every test against that binary, so the
 // tests exercise the command rather than the library behind it.
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "dtrim-bin")
+	dir, err := os.MkdirTemp("", "docker-trim-bin")
 	if err != nil {
 		panic(err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 
-	binary = filepath.Join(dir, "dtrim")
+	binary = filepath.Join(dir, "docker-trim")
 	if runtime.GOOS == "windows" {
 		// Without the extension, exec.Command cannot find the binary that was
 		// just built a line below.
@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	build := exec.Command("go", "build", "-o", binary, "..")
 	build.Stderr = os.Stderr
 	if err := build.Run(); err != nil {
-		panic("cannot build dtrim: " + err.Error())
+		panic("cannot build docker-trim: " + err.Error())
 	}
 	os.Exit(m.Run())
 }
@@ -41,7 +41,7 @@ type result struct {
 	code           int
 }
 
-func dtrim(t *testing.T, args ...string) result {
+func dockerTrim(t *testing.T, args ...string) result {
 	t.Helper()
 	cmd := exec.Command(binary, append([]string{"--no-color"}, args...)...)
 	var out, errb strings.Builder
@@ -52,7 +52,7 @@ func dtrim(t *testing.T, args ...string) result {
 	if err := cmd.Run(); err != nil {
 		var ee *exec.ExitError
 		if !asExitError(err, &ee) {
-			t.Fatalf("running dtrim: %v", err)
+			t.Fatalf("running docker-trim: %v", err)
 		}
 		code = ee.ExitCode()
 	}
@@ -70,7 +70,7 @@ func asExitError(err error, target **exec.ExitError) bool {
 func fixture(name string) string { return filepath.Join("fixtures", name) }
 
 func TestAnalyzeOnly_reports_findings_and_succeeds(t *testing.T) {
-	r := dtrim(t, "--analyze-only", "-f", fixture("node-express.Dockerfile"))
+	r := dockerTrim(t, "--analyze-only", "-f", fixture("node-express.Dockerfile"))
 
 	if r.code != 0 {
 		t.Fatalf("exit code = %d, want 0\n%s%s", r.code, r.stdout, r.stderr)
@@ -96,7 +96,7 @@ func TestAnalyzeOnly_writes_nothing(t *testing.T) {
 	}
 
 	before, _ := os.ReadDir(dir)
-	r := dtrim(t, "--analyze-only", "--optimize", "-f", target, "-o", filepath.Join(dir, "out"))
+	r := dockerTrim(t, "--analyze-only", "--optimize", "-f", target, "-o", filepath.Join(dir, "out"))
 	if r.code != 0 {
 		t.Fatalf("exit code = %d\n%s%s", r.code, r.stdout, r.stderr)
 	}
@@ -113,7 +113,7 @@ func TestAnalyzeOnly_writes_nothing(t *testing.T) {
 
 func TestOptimize_writes_the_trimmed_file(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "Dockerfile.trimmed")
-	r := dtrim(t, "--optimize", "-f", fixture("go-api.Dockerfile"), "-o", out)
+	r := dockerTrim(t, "--optimize", "-f", fixture("go-api.Dockerfile"), "-o", out)
 
 	if r.code != 0 {
 		t.Fatalf("exit code = %d\n%s%s", r.code, r.stdout, r.stderr)
@@ -131,7 +131,7 @@ func TestOptimize_writes_the_trimmed_file(t *testing.T) {
 }
 
 func TestQuiet_emits_only_valid_json(t *testing.T) {
-	r := dtrim(t, "--analyze-only", "-f", fixture("python-flask.Dockerfile"), "--quiet")
+	r := dockerTrim(t, "--analyze-only", "-f", fixture("python-flask.Dockerfile"), "--quiet")
 
 	if r.code != 0 {
 		t.Fatalf("exit code = %d\n%s%s", r.code, r.stdout, r.stderr)
@@ -153,7 +153,7 @@ func TestQuiet_emits_only_valid_json(t *testing.T) {
 	if rep.SchemaVersion != 2 {
 		t.Errorf("schemaVersion = %d, want 2", rep.SchemaVersion)
 	}
-	if rep.Tool != "dtrim" {
+	if rep.Tool != "docker-trim" {
 		t.Errorf("tool = %q", rep.Tool)
 	}
 	if rep.Dockerfile.Ecosystem != "python" {
@@ -163,7 +163,7 @@ func TestQuiet_emits_only_valid_json(t *testing.T) {
 		t.Error("no findings in the JSON report")
 	}
 	// --quiet exists so the output can be piped; progress must not leak in.
-	if strings.Contains(r.stdout, "[dtrim]") {
+	if strings.Contains(r.stdout, "[docker-trim]") {
 		t.Error("progress output leaked into the JSON on stdout")
 	}
 }
@@ -175,12 +175,12 @@ func TestExitCode_is_two_on_error(t *testing.T) {
 		{"-f", fixture("go-api.Dockerfile"), "--aggressiveness", "reckless"},
 	}
 	for _, args := range cases {
-		r := dtrim(t, args...)
+		r := dockerTrim(t, args...)
 		if r.code != 2 {
 			t.Errorf("%v: exit code = %d, want 2\n%s", args, r.code, r.stderr)
 		}
-		if !strings.HasPrefix(r.stderr, "dtrim: ") {
-			t.Errorf("%v: stderr = %q, want it to start with \"dtrim: \"", args, r.stderr)
+		if !strings.HasPrefix(r.stderr, "docker-trim: ") {
+			t.Errorf("%v: stderr = %q, want it to start with \"docker-trim: \"", args, r.stderr)
 		}
 	}
 }
@@ -190,7 +190,7 @@ func TestExitCode_is_two_on_error(t *testing.T) {
 // only ebpf is left; validation happens before any image is touched, which is
 // why this needs no Docker.
 func TestUnimplementedBackends_name_one_that_works(t *testing.T) {
-	r := dtrim(t, "--image", "busybox:latest", "--tracer", "ebpf")
+	r := dockerTrim(t, "--image", "busybox:latest", "--tracer", "ebpf")
 	if r.code != 2 {
 		t.Errorf("--tracer ebpf: exit code = %d, want 2", r.code)
 	}
@@ -206,7 +206,7 @@ func TestUnimplementedBackends_name_one_that_works(t *testing.T) {
 // before anything touches Docker.
 func TestImplementedBackends_pass_validation(t *testing.T) {
 	for _, backend := range []string{"proc", "ptrace"} {
-		r := dtrim(t, "--image", "dtrim-no-such-image:v0", "--tracer", backend)
+		r := dockerTrim(t, "--image", "docker-trim-no-such-image:v0", "--tracer", backend)
 		// It should fail on the missing image, not on the backend name.
 		if strings.Contains(r.stderr, "not implemented") {
 			t.Errorf("--tracer %s was rejected as unimplemented: %q", backend, r.stderr)
@@ -217,7 +217,7 @@ func TestImplementedBackends_pass_validation(t *testing.T) {
 // Tracing needs something to run, and saying which flag is missing is more
 // useful than a generic validation error.
 func TestTracerWithoutAnImage_says_which_flag_is_missing(t *testing.T) {
-	r := dtrim(t, "-f", fixture("go-api.Dockerfile"), "--tracer", "proc")
+	r := dockerTrim(t, "-f", fixture("go-api.Dockerfile"), "--tracer", "proc")
 	if r.code != 2 {
 		t.Fatalf("exit code = %d, want 2", r.code)
 	}
@@ -227,7 +227,7 @@ func TestTracerWithoutAnImage_says_which_flag_is_missing(t *testing.T) {
 }
 
 func TestTraceWithoutABackend_says_which_flag_is_missing(t *testing.T) {
-	r := dtrim(t, "--image", "busybox:latest", "--trace", "echo hi")
+	r := dockerTrim(t, "--image", "busybox:latest", "--trace", "echo hi")
 	if r.code != 2 {
 		t.Fatalf("exit code = %d, want 2", r.code)
 	}
@@ -237,7 +237,7 @@ func TestTraceWithoutABackend_says_which_flag_is_missing(t *testing.T) {
 }
 
 func TestPositionalArgument_is_read_as_a_dockerfile_when_it_is_one(t *testing.T) {
-	r := dtrim(t, "--analyze-only", fixture("rust-cli.Dockerfile"))
+	r := dockerTrim(t, "--analyze-only", fixture("rust-cli.Dockerfile"))
 	if r.code != 0 {
 		t.Fatalf("exit code = %d\n%s%s", r.code, r.stdout, r.stderr)
 	}
@@ -248,12 +248,12 @@ func TestPositionalArgument_is_read_as_a_dockerfile_when_it_is_one(t *testing.T)
 
 func TestMarkdown_renders_a_pull_request_report(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "Dockerfile.trimmed")
-	r := dtrim(t, "--optimize", "-f", fixture("go-api.Dockerfile"), "-o", out, "--markdown")
+	r := dockerTrim(t, "--optimize", "-f", fixture("go-api.Dockerfile"), "-o", out, "--markdown")
 
 	if r.code != 0 {
 		t.Fatalf("exit code = %d\n%s", r.code, r.stderr)
 	}
-	for _, want := range []string{"## dtrim report", "```diff"} {
+	for _, want := range []string{"## docker-trim report", "```diff"} {
 		if !strings.Contains(r.stdout, want) {
 			t.Errorf("markdown output does not contain %q:\n%s", want, r.stdout)
 		}
@@ -269,7 +269,7 @@ func TestMarkdown_renders_a_pull_request_report(t *testing.T) {
 // features shipped, each time asserting that something already working was
 // still planned.
 func TestHelp_describes_what_is_actually_built(t *testing.T) {
-	r := dtrim(t, "--help")
+	r := dockerTrim(t, "--help")
 	if r.code != 0 {
 		t.Fatalf("exit code = %d", r.code)
 	}
@@ -300,7 +300,7 @@ func TestHelp_describes_what_is_actually_built(t *testing.T) {
 		if flag != "--tracer" {
 			continue
 		}
-		res := dtrim(t, "--image", "busybox:latest", "--tracer", "ebpf")
+		res := dockerTrim(t, "--image", "busybox:latest", "--tracer", "ebpf")
 		if res.code != 2 || !strings.Contains(res.stderr, "not implemented") {
 			t.Errorf("%s says a backend is planned, but it does not refuse: code=%d %q",
 				flag, res.code, res.stderr)
@@ -330,15 +330,15 @@ func flagName(line string) string {
 }
 
 func TestVersion_prints_something(t *testing.T) {
-	r := dtrim(t, "--version")
-	if r.code != 0 || !strings.Contains(r.stdout, "dtrim") {
+	r := dockerTrim(t, "--version")
+	if r.code != 0 || !strings.Contains(r.stdout, "docker-trim") {
 		t.Errorf("--version: code=%d output=%q", r.code, r.stdout)
 	}
 }
 
-// --fail-on is what makes dtrim usable as a CI gate, so the three exit codes
+// --fail-on is what makes docker-trim usable as a CI gate, so the three exit codes
 // have to stay distinct: a pipeline needs to tell "your Dockerfile ships a
-// shell" from "dtrim could not run".
+// shell" from "docker-trim could not run".
 func TestFailOn_exit_codes(t *testing.T) {
 	cases := []struct {
 		name string
@@ -356,7 +356,7 @@ func TestFailOn_exit_codes(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := dtrim(t, c.args...); got.code != c.want {
+			if got := dockerTrim(t, c.args...); got.code != c.want {
 				t.Errorf("exit code = %d, want %d\n%s%s", got.code, c.want, got.stdout, got.stderr)
 			}
 		})
@@ -364,7 +364,7 @@ func TestFailOn_exit_codes(t *testing.T) {
 }
 
 func TestFailOn_names_the_rules_responsible(t *testing.T) {
-	r := dtrim(t, "--analyze-only", "-f", fixture("node-express.Dockerfile"), "--fail-on", "high", "--no-diff")
+	r := dockerTrim(t, "--analyze-only", "-f", fixture("node-express.Dockerfile"), "--fail-on", "high", "--no-diff")
 
 	if r.code != 1 {
 		t.Fatalf("exit code = %d, want 1", r.code)
@@ -382,7 +382,7 @@ func TestFailOn_names_the_rules_responsible(t *testing.T) {
 }
 
 func TestFailOn_says_so_when_it_passes(t *testing.T) {
-	r := dtrim(t, "--analyze-only", "-f", fixture("already-multistage.Dockerfile"), "--fail-on", "critical", "--no-diff")
+	r := dockerTrim(t, "--analyze-only", "-f", fixture("already-multistage.Dockerfile"), "--fail-on", "critical", "--no-diff")
 	if r.code != 0 {
 		t.Fatalf("exit code = %d, want 0", r.code)
 	}
@@ -395,8 +395,8 @@ func TestFailOn_says_so_when_it_passes(t *testing.T) {
 // not keep failing the pipeline.
 func TestFailOn_ignores_findings_that_were_fixed(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "Dockerfile.trimmed")
-	analyzed := dtrim(t, "--analyze-only", "-f", fixture("go-api.Dockerfile"), "--fail-on", "medium")
-	optimized := dtrim(t, "--optimize", "-f", fixture("go-api.Dockerfile"), "-o", out, "--fail-on", "medium", "--no-diff")
+	analyzed := dockerTrim(t, "--analyze-only", "-f", fixture("go-api.Dockerfile"), "--fail-on", "medium")
+	optimized := dockerTrim(t, "--optimize", "-f", fixture("go-api.Dockerfile"), "-o", out, "--fail-on", "medium", "--no-diff")
 
 	if analyzed.code != 1 {
 		t.Fatalf("the unfixed file should trip a medium gate, got exit %d", analyzed.code)
@@ -404,5 +404,72 @@ func TestFailOn_ignores_findings_that_were_fixed(t *testing.T) {
 	if optimized.code != 0 {
 		t.Errorf("after rewriting, the medium findings are gone, so the gate should pass; got exit %d\n%s",
 			optimized.code, optimized.stdout)
+	}
+}
+
+// docker-trim is named exactly like a Docker CLI plugin, so it should behave
+// like one: dropped into ~/.docker/cli-plugins it becomes `docker trim`.
+//
+// Docker asks a candidate plugin for this one hidden command to learn what it
+// is, and reports anything that cannot answer as invalid. Since the name
+// invites people to put it there, refusing to answer would be a confusing way
+// to greet them.
+func TestPluginMetadata_answers_dockers_question(t *testing.T) {
+	// Invoked bare, exactly as Docker does it: the shared helper adds
+	// --no-color, which this subcommand has no reason to accept.
+	out, err := exec.Command(binary, "docker-cli-plugin-metadata").CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	var meta map[string]string
+	if err := json.Unmarshal(out, &meta); err != nil {
+		t.Fatalf("the metadata is not valid JSON: %v\n%s", err, out)
+	}
+	// Docker requires these; the others are courtesy.
+	for _, key := range []string{"SchemaVersion", "Vendor", "Version", "ShortDescription"} {
+		if meta[key] == "" {
+			t.Errorf("%s is empty: %v", key, meta)
+		}
+	}
+	if meta["SchemaVersion"] != "0.1.0" {
+		t.Errorf("SchemaVersion = %q, want 0.1.0", meta["SchemaVersion"])
+	}
+	// It must not clutter the help of a tool most people run directly.
+	if h := dockerTrim(t, "--help"); strings.Contains(h.stdout, "docker-cli-plugin-metadata") {
+		t.Error("the plugin command is advertised in --help")
+	}
+}
+
+// Docker passes the subcommand it matched as the first argument, so
+// `docker trim --analyze-only -f x` arrives as `docker-trim trim --analyze-only
+// -f x`. Left in place it parses as a positional argument, and dtrim went
+// looking for an image called "trim".
+func TestPluginInvocation_drops_the_subcommand_docker_passes(t *testing.T) {
+	dir := t.TempDir()
+	df := filepath.Join(dir, "Dockerfile")
+	if err := os.WriteFile(df, []byte("FROM alpine:3.21\nCMD [\"/bin/true\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// As Docker invokes it: the plugin name first, and the marker set.
+	cmd := exec.Command(binary, "trim", "--no-color", "--analyze-only", "-f", df, "--no-diff")
+	cmd.Env = append(os.Environ(),
+		"DOCKER_CLI_PLUGIN_ORIGINAL_CLI_COMMAND=/usr/local/bin/docker")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("running as a plugin failed: %v\n%s", err, out)
+	}
+	if strings.Contains(string(out), "trim:latest") || strings.Contains(string(out), "No such image") {
+		t.Errorf("the plugin subcommand was parsed as an image reference:\n%s", out)
+	}
+	if !strings.Contains(string(out), "Analyzed") {
+		t.Errorf("the Dockerfile was not analysed:\n%s", out)
+	}
+
+	// Without the marker it is someone typing the name, and a positional
+	// argument means what it says.
+	plain := dockerTrim(t, "--analyze-only", "-f", df, "--no-diff")
+	if plain.code != 0 {
+		t.Errorf("direct invocation broke: exit %d\n%s", plain.code, plain.stderr)
 	}
 }

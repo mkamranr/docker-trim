@@ -27,7 +27,7 @@ func (ptraceTracer) Backend() Backend { return BackendPtrace }
 //
 // The default seccomp profile blocks ptrace outright, so allowing the
 // capability alone is not enough. Both are scoped to the throwaway container
-// dtrim builds for the trace and never touch the image being analysed.
+// docker-trim builds for the trace and never touch the image being analysed.
 var ptraceDockerFlags = []string{
 	"--cap-add=SYS_PTRACE",
 	"--security-opt", "seccomp=unconfined",

@@ -1,4 +1,4 @@
-// Command dtrim-sensor watches what a container actually uses.
+// Command docker-trim-sensor watches what a container actually uses.
 //
 // It is injected into a copy of the target image as an entrypoint wrapper,
 // starts the real command as its child, and samples /proc while that command
@@ -35,10 +35,10 @@ import (
 
 // The manifest is delimited on stderr rather than written to a file: the image
 // under trace may run as a user who cannot create one, and a marker costs
-// nothing. dtrim reads the container's logs and takes what is between these.
+// nothing. docker-trim reads the container's logs and takes what is between these.
 const (
-	beginMarker = "<<<DTRIM-TRACE-BEGIN>>>"
-	endMarker   = "<<<DTRIM-TRACE-END>>>"
+	beginMarker = "<<<DOCKER-TRIM-TRACE-BEGIN>>>"
+	endMarker   = "<<<DOCKER-TRIM-TRACE-END>>>"
 )
 
 // manifest mirrors the PRD's TraceManifest.
@@ -67,7 +67,7 @@ func main() {
 
 	argv := flag.Args()
 	if len(argv) == 0 {
-		fmt.Fprintln(os.Stderr, "dtrim-sensor: no command to run")
+		fmt.Fprintln(os.Stderr, "docker-trim-sensor: no command to run")
 		os.Exit(2)
 	}
 
@@ -84,11 +84,11 @@ func main() {
 	case "ptrace":
 		code, err = runPtrace(argv, c)
 	default:
-		fmt.Fprintf(os.Stderr, "dtrim-sensor: unknown mode %q\n", *mode)
+		fmt.Fprintf(os.Stderr, "docker-trim-sensor: unknown mode %q\n", *mode)
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "dtrim-sensor: %v\n", err)
+		fmt.Fprintf(os.Stderr, "docker-trim-sensor: %v\n", err)
 	}
 
 	// The manifest is emitted even when the run failed: a partial trace of a
@@ -195,7 +195,7 @@ func usefulPath(p string) bool {
 	}
 	switch {
 	case strings.HasPrefix(p, "/proc/"), strings.HasPrefix(p, "/sys/"),
-		strings.HasPrefix(p, "/dev/"), strings.HasPrefix(p, "/.dtrim"):
+		strings.HasPrefix(p, "/dev/"), strings.HasPrefix(p, "/.docker-trim"):
 		return false
 	}
 	return true
@@ -226,7 +226,7 @@ func (c *collector) emit(elapsed time.Duration) {
 
 	encoded, err := json.Marshal(m)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "dtrim-sensor: cannot encode the manifest: %v\n", err)
+		fmt.Fprintf(os.Stderr, "docker-trim-sensor: cannot encode the manifest: %v\n", err)
 		return
 	}
 	fmt.Fprintf(os.Stderr, "\n%s\n%s\n%s\n", beginMarker, encoded, endMarker)

@@ -6,7 +6,7 @@ import (
 )
 
 // Vectors with scores published by NVD or FIRST. Getting this wrong would
-// silently mis-band every vulnerability dtrim reports, so the arithmetic is
+// silently mis-band every vulnerability docker-trim reports, so the arithmetic is
 // checked against known answers rather than against itself.
 func TestBaseScore_matches_published_scores(t *testing.T) {
 	cases := []struct {

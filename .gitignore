@@ -1,5 +1,5 @@
 # Build output
-/dtrim
+/docker-trim
 /dist/
 /bin/
 

@@ -15,11 +15,11 @@ COPY . .
 
 RUN cargo build --release
 
-# dtrim(DT100): runtime stage carries the application and nothing else
+# docker-trim(DT100): runtime stage carries the application and nothing else
 FROM gcr.io/distroless/cc-debian12:nonroot
 WORKDIR /build
-# dtrim(DT101): only the build output crosses the stage boundary
+# docker-trim(DT101): only the build output crosses the stage boundary
 COPY --from=builder --chown=nonroot:nonroot /build/target/release/mytool /build/target/release/mytool
-# dtrim(DT010): drop privileges before the process starts
+# docker-trim(DT010): drop privileges before the process starts
 USER nonroot:nonroot
 ENTRYPOINT ["/build/target/release/mytool"]

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Rule is one thing dtrim knows how to notice about a Dockerfile.
+// Rule is one thing docker-trim knows how to notice about a Dockerfile.
 //
 // The interface mirrors the shape used by the sibling ctrim project: small,
 // stateless units registered in one place, each owning its own explanation.
@@ -34,7 +34,7 @@ type Fixer interface {
 	Fix(*Analysis) []Finding
 }
 
-// registry is every rule dtrim ships, in ID order.
+// registry is every rule docker-trim ships, in ID order.
 func registry() []Rule {
 	return []Rule{
 		ruleNoInstallRecommends{},
@@ -715,7 +715,7 @@ func (r ruleRunsAsRoot) Check(a *Analysis) []Finding {
 	}
 	// A base image can drop privileges on the stage's behalf, and the images
 	// that do say so in the tag. Flagging those would mean flagging the exact
-	// practice dtrim recommends everywhere else.
+	// practice docker-trim recommends everywhere else.
 	if baseRunsAsNonRoot(final.BaseImage) {
 		return nil
 	}
@@ -731,7 +731,7 @@ func (r ruleRunsAsRoot) Check(a *Analysis) []Finding {
 // Dockerfile must not require pulling every base image it mentions. The
 // `nonroot` tag is a convention rather than a guarantee, but it is one both
 // Google's distroless images and Chainguard's follow deliberately, and honouring
-// it is what stops dtrim from flagging the arrangement it tells everyone to
+// it is what stops docker-trim from flagging the arrangement it tells everyone to
 // adopt. A base that drops privileges without saying so in its tag still gets
 // the finding, which is the safe direction to be wrong in.
 func baseRunsAsNonRoot(base string) bool {

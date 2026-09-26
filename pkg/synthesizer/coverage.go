@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // RuntimeGap is something a trace saw the program use that the runtime stage

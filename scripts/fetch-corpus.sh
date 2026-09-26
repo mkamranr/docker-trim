@@ -2,7 +2,7 @@
 # Build a corpus of real Dockerfiles for tests/corpus_test.go.
 #
 # The rest of the test suite uses fixtures this project wrote, which only
-# contains shapes dtrim was designed for. This fetches files written by other
+# contains shapes docker-trim was designed for. This fetches files written by other
 # people, which is the closest thing to user feedback available before there
 # are users.
 #
@@ -10,7 +10,7 @@
 # would freeze a snapshot that stops being representative. Re-run this instead.
 #
 #   scripts/fetch-corpus.sh
-#   DTRIM_CORPUS="$PWD/tests/corpus" go test -tags corpus ./tests/ -run Corpus -v
+#   DOCKER_TRIM_CORPUS="$PWD/tests/corpus" go test -tags corpus ./tests/ -run Corpus -v
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -20,7 +20,7 @@ mkdir -p "$out"
 # Local Dockerfiles, if this checkout sits alongside other projects. These make
 # the corpus reflect one developer's habits, which is a bias worth knowing
 # about when reading the survey.
-if [ "${DTRIM_CORPUS_LOCAL:-1}" = "1" ]; then
+if [ "${DOCKER_TRIM_CORPUS_LOCAL:-1}" = "1" ]; then
   while IFS= read -r f; do
     rel=$(echo "$f" | sed 's|^\.\./||; s|/|__|g')
     cp "$f" "$out/local__${rel}" 2>/dev/null || true

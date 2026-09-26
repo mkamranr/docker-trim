@@ -1,12 +1,12 @@
-package dtrim
+package trim
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/security"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/security"
 )
 
 func reportWithScan(total int) *Report {
@@ -20,7 +20,7 @@ func reportWithScan(total int) *Report {
 // nothing to enumerate is unreadable, not clean, and reporting its zero as a
 // reduction would turn a parser gap into a security claim.
 //
-// scratch is the honest case: it genuinely contains nothing, and dtrim still
+// scratch is the honest case: it genuinely contains nothing, and docker-trim still
 // must not say the vulnerabilities went away.
 func TestCompareVulnerabilities_refuses_to_claim_a_reduction_it_cannot_measure(t *testing.T) {
 	rep := reportWithScan(72)

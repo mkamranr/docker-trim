@@ -1,4 +1,4 @@
-package dtrim
+package trim
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/tracer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/tracer"
 )
 
 // smokeWindow is how long a trimmed image is watched before it is accepted as
@@ -32,7 +32,7 @@ type Verification struct {
 // context and measures both.
 //
 // This is what turns an estimate into a number worth publishing. Everything
-// dtrim prints as a measurement comes from here; without it, sizes stay
+// docker-trim prints as a measurement comes from here; without it, sizes stay
 // labelled as estimates.
 func verify(ctx context.Context, cfg Config, rep *Report) error {
 	df := rep.Dockerfile
@@ -51,8 +51,8 @@ func verify(ctx context.Context, cfg Config, rep *Report) error {
 	}
 
 	id := tracer.ShortHash(cfg.File + df.Trimmed)
-	origTag := "dtrim-verify-original:" + id
-	trimTag := "dtrim-verify-trimmed:" + id
+	origTag := "docker-trim-verify-original:" + id
+	trimTag := "docker-trim-verify-trimmed:" + id
 	defer tracer.Remove(context.WithoutCancel(ctx), origTag, trimTag)
 
 	// Docker's own build output is long and drowns the report. Show it only
@@ -67,28 +67,28 @@ func verify(ctx context.Context, cfg Config, rep *Report) error {
 		}
 	}
 
-	_, _ = fmt.Fprintf(status, "[dtrim] Building the original image to measure it...\n")
+	_, _ = fmt.Fprintf(status, "[docker-trim] Building the original image to measure it...\n")
 	originalSize, err := tracer.Build(ctx, tracer.BuildRequest{
 		Dockerfile: cfg.File, Context: buildContext, Tag: origTag, Progress: progress})
 	if err != nil {
 		return fmt.Errorf("the original Dockerfile does not build, so there is nothing to compare against: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(status, "[dtrim] Building the trimmed image...\n")
+	_, _ = fmt.Fprintf(status, "[docker-trim] Building the trimmed image...\n")
 	trimmedSize, err := tracer.Build(ctx, tracer.BuildRequest{
 		Dockerfile: df.Output, Context: buildContext, Tag: trimTag, Progress: progress})
 	if err != nil {
-		return fmt.Errorf("the trimmed Dockerfile does not build. This is a dtrim bug: please "+
+		return fmt.Errorf("the trimmed Dockerfile does not build. This is a docker-trim bug: please "+
 			"open a bad-rewrite issue with %s attached.\n%w", df.Output, err)
 	}
 
-	_, _ = fmt.Fprintf(status, "[dtrim] Starting the trimmed image to check it still runs...\n")
+	_, _ = fmt.Fprintf(status, "[docker-trim] Starting the trimmed image to check it still runs...\n")
 	smoke := tracer.Smoke(ctx, trimTag, smokeWindow)
 
 	// While the image still exists: the cleanup defer registered above removes
 	// it the moment this function returns, so there is nowhere later to do it.
 	if cfg.OSV && rep.Vulnerabilities != nil {
-		_, _ = fmt.Fprintf(status, "[dtrim] Checking what the rewrite removed...\n")
+		_, _ = fmt.Fprintf(status, "[docker-trim] Checking what the rewrite removed...\n")
 		after, err := analyzer.InspectImage(ctx, trimTag)
 		if err != nil {
 			rep.Notes = append(rep.Notes,

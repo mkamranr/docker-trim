@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest something dtrim should do
+description: Suggest something docker-trim should do
 title: "[feat] "
 labels: ["enhancement"]
 body:
@@ -7,7 +7,7 @@ body:
     id: problem
     attributes:
       label: The problem
-      description: What are you trying to do that dtrim makes hard or impossible?
+      description: What are you trying to do that docker-trim makes hard or impossible?
     validations:
       required: true
   - type: textarea
@@ -19,12 +19,12 @@ body:
   - type: checkboxes
     id: scope
     attributes:
-      label: Does it fit what dtrim is?
+      label: Does it fit what docker-trim is?
       description: |
-        dtrim shrinks container images and reports their attack surface, and it never
+        docker-trim shrinks container images and reports their attack surface, and it never
         reports a size it did not measure. Tick what applies; leave a box unticked and say
         why in the box above if you think the rule should bend here.
       options:
         - label: It makes images smaller, or explains where their bytes went
         - label: It can be verified by building the result, not just asserted
-        - label: It does not require dtrim to guess at what a build produces
+        - label: It does not require docker-trim to guess at what a build produces

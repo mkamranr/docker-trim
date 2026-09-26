@@ -16,8 +16,8 @@ var (
 // Version is the semantic version of this build, without a leading "v".
 func Version() string { return version }
 
-// String is the value shown by `dtrim --version`.
+// String is the value shown by `docker-trim --version`.
 func String() string {
-	return fmt.Sprintf("dtrim %s (commit %s, built %s, %s/%s, %s)",
+	return fmt.Sprintf("docker-trim %s (commit %s, built %s, %s/%s, %s)",
 		version, commit, date, runtime.GOOS, runtime.GOARCH, runtime.Version())
 }

@@ -1,4 +1,4 @@
-# Shaped after a real, already-optimised project file. dtrim must recognise
+# Shaped after a real, already-optimised project file. docker-trim must recognise
 # that the author has made the layering decisions and leave the structure alone.
 ARG PYTORCH_VARIANT=cpu
 

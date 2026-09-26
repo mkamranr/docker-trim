@@ -11,13 +11,13 @@ COPY . .
 
 RUN mvn -B package -DskipTests
 
-# dtrim(DT100): runtime stage carries the application and nothing else
+# docker-trim(DT100): runtime stage carries the application and nothing else
 FROM gcr.io/distroless/java21-debian12:nonroot
 WORKDIR /workspace
-# dtrim(DT101): only the build output crosses the stage boundary
+# docker-trim(DT101): only the build output crosses the stage boundary
 COPY --from=builder --chown=nonroot:nonroot /workspace/target/app.jar /workspace/target/app.jar
 EXPOSE 8080
-# dtrim(DT010): drop privileges before the process starts
+# docker-trim(DT010): drop privileges before the process starts
 USER nonroot:nonroot
-# dtrim(DT102): gcr.io/distroless/java21-debian12:nonroot supplies the interpreter as its entrypoint
+# docker-trim(DT102): gcr.io/distroless/java21-debian12:nonroot supplies the interpreter as its entrypoint
 CMD ["/workspace/target/app.jar"]

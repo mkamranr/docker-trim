@@ -1,8 +1,8 @@
-BINARY  := dtrim
+BINARY  := docker-trim
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-PKG     := github.com/mkamranr/dtrim/internal/version
+PKG     := github.com/mkamranr/docker-trim/internal/version
 LDFLAGS := -s -w -X $(PKG).version=$(VERSION) -X $(PKG).commit=$(COMMIT) -X $(PKG).date=$(DATE)
 
 .PHONY: build test lint fmt bench integration clean install
@@ -38,10 +38,10 @@ bench:
 
 # Needs a running Docker daemon; builds real images.
 integration: build
-	DTRIM_INTEGRATION=1 go test -tags integration -timeout 30m ./tests/... -v
+	DOCKER_TRIM_INTEGRATION=1 go test -tags integration -timeout 30m ./tests/... -v
 
 install: build
-	install -m 0755 $(BINARY) $${DTRIM_BIN_DIR:-/usr/local/bin}/$(BINARY)
+	install -m 0755 $(BINARY) $${DOCKER_TRIM_BIN_DIR:-/usr/local/bin}/$(BINARY)
 
 clean:
 	rm -rf $(BINARY) dist tests/fixtures/generated

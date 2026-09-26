@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // fakeOSV stands in for api.osv.dev, serving both the batch triage and the

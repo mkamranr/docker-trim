@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // pruneUnused removes packages a trace never saw used from the install commands
@@ -15,7 +15,7 @@ import (
 //
 // It removes packages from the install rather than purging them afterwards. A
 // purge in a later RUN cannot shrink an earlier layer, so appending one makes
-// the image bigger while appearing to clean up. dtrim reports that as DT002 in
+// the image bigger while appearing to clean up. docker-trim reports that as DT002 in
 // other people's Dockerfiles and must not do it in its own output.
 //
 // It only touches the stage that ships. A trace observes the finished image

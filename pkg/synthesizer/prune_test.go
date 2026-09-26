@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 func usageWithUnused(names ...string) *analyzer.Usage {
@@ -148,7 +148,7 @@ func TestPrune_does_nothing_without_a_trace_or_without_the_flag(t *testing.T) {
 }
 
 // Whatever it removes, the result has to still be a Dockerfile, and running
-// dtrim on its own output must not keep changing it.
+// docker-trim on its own output must not keep changing it.
 func TestPrune_output_is_stable(t *testing.T) {
 	opts := Options{
 		Base:           BaseDistroless,

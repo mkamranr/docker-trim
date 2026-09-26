@@ -1,4 +1,4 @@
-// Package tracer runs containers on behalf of dtrim: building images to
+// Package tracer runs containers on behalf of docker-trim: building images to
 // measure them today, and observing a running container to learn which files
 // it actually touches in a later release.
 //
@@ -107,7 +107,7 @@ func Smoke(ctx context.Context, tag string, window time.Duration) SmokeResult {
 	runCtx, cancel := context.WithTimeout(ctx, window+30*time.Second)
 	defer cancel()
 
-	name := "dtrim-smoke-" + sanitize(tag)
+	name := "docker-trim-smoke-" + sanitize(tag)
 	_ = exec.CommandContext(runCtx, "docker", "rm", "-f", name).Run()
 
 	// Deliberately not --rm: an exited container has to stay inspectable, or

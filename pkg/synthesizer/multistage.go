@@ -3,7 +3,7 @@ package synthesizer
 import (
 	"strings"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // builderStageName is the name given to the stage that keeps the toolchain.
@@ -64,7 +64,7 @@ func Optimize(a *analyzer.Analysis, opts Options) *Result {
 
 	if a.MultiStage() {
 		res.Plan = Plan{Ecosystem: DetectEcosystem(a), Supported: false,
-			Reason: "the file already builds in multiple stages, so dtrim left the structure " +
+			Reason: "the file already builds in multiple stages, so docker-trim left the structure " +
 				"alone and applied cleanups only."}
 		res.Notes = append(res.Notes, res.Plan.Reason)
 		res.Fixed, res.Remaining = analyzer.FixAll(a, aggressiveness)
@@ -100,7 +100,7 @@ func Optimize(a *analyzer.Analysis, opts Options) *Result {
 			// says most of the same thing.
 			old := res.Plan.Reason
 			res.Plan.Reason += " Splitting into stages on the same base would save nothing, " +
-				"so dtrim applied cleanups only."
+				"so docker-trim applied cleanups only."
 			res.Plan.Warnings = withoutString(res.Plan.Warnings, old)
 		}
 		res.Notes = append(res.Notes, res.Plan.Reason)
@@ -357,7 +357,7 @@ func applyPrepare(in []analyzer.Instruction, prepare []string) []analyzer.Instru
 		ins := analyzer.Instruction{
 			Keyword: keyword,
 			Args:    strings.Fields(rest),
-			Lead:    []string{comment("DT103", "added by dtrim so the runtime stage can be minimal")},
+			Lead:    []string{comment("DT103", "added by docker-trim so the runtime stage can be minimal")},
 		}
 		if keyword == "ENV" {
 			// Insert directly after FROM so every later command sees it.

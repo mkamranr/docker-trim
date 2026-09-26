@@ -1,4 +1,4 @@
-package dtrim
+package trim
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/tracer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/tracer"
 )
 
 // runTrace watches the image run and attributes what it touched back to the
@@ -29,7 +29,7 @@ func runTrace(ctx context.Context, cfg Config, rep *Report) error {
 		opts.Command = []string{"/bin/sh", "-c", cfg.Trace}
 	}
 	if !cfg.Quiet && cfg.Stderr != nil {
-		opts.Progress = func(msg string) { _, _ = fmt.Fprintf(cfg.Stderr, "[dtrim] %s\n", msg) }
+		opts.Progress = func(msg string) { _, _ = fmt.Fprintf(cfg.Stderr, "[docker-trim] %s\n", msg) }
 	}
 
 	result, err := backend.Trace(ctx, opts)
@@ -98,14 +98,14 @@ func coverageNotes(r *tracer.Result, cfg Config) []string {
 		notes = append(notes,
 			"Every execve and openat was observed, and only calls that succeeded were counted, "+
 				"so nothing was missed within this run. What the run itself did not exercise is "+
-				"still invisible: dtrim reports what to consider removing and leaves the "+
+				"still invisible: docker-trim reports what to consider removing and leaves the "+
 				"decision to you.")
 	default:
 		notes = append(notes,
 			"Sampling /proc sees every binary that ran and every library that loaded, and can "+
 				"miss a file opened and closed between two samples. --tracer ptrace misses "+
 				"nothing, at the cost of needing CAP_SYS_PTRACE. Either way this is evidence, "+
-				"not proof: dtrim reports what to consider removing and leaves the decision to you.")
+				"not proof: docker-trim reports what to consider removing and leaves the decision to you.")
 	}
 	return notes
 }

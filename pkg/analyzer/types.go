@@ -2,7 +2,7 @@ package analyzer
 
 // The data structures declared in the PRD (section 5). They live in this leaf
 // package so every stage of the pipeline can use them without an import cycle;
-// package dtrim re-exports them under the names the PRD uses, which is the
+// package docker-trim re-exports them under the names the PRD uses, which is the
 // interface the library presents.
 
 import (
@@ -40,7 +40,7 @@ type Instruction struct {
 	EndLine int `json:"endLine,omitempty"`
 	// Lead is the verbatim source between the previous instruction and this
 	// one: comments, blank lines, and the spacing between them. Carrying it
-	// makes rendering lossless, so a file dtrim did not change comes back out
+	// makes rendering lossless, so a file docker-trim did not change comes back out
 	// byte-for-byte and `--optimize` on an already-clean file produces an
 	// empty diff rather than a reformatting storm.
 	Lead []string `json:"-"`
@@ -64,7 +64,7 @@ type TraceManifest struct {
 // OptimizationResult is the headline reduction report.
 //
 // PRD section 5. Sizes are only populated with measured values when --verify
-// built both images; Measured records which it is, because dtrim never presents
+// built both images; Measured records which it is, because docker-trim never presents
 // an estimate as though it were a measurement.
 type OptimizationResult struct {
 	OriginalSizeBytes    int64         `json:"originalSizeBytes"`
@@ -75,7 +75,7 @@ type OptimizationResult struct {
 	RemainingCVEs        int           `json:"remainingCVEs"`
 	Duration             time.Duration `json:"-"`
 
-	// Measured is true when both sizes came from images dtrim actually built.
+	// Measured is true when both sizes came from images docker-trim actually built.
 	Measured bool `json:"measured"`
 	// CVEsKnown is false when no vulnerability source was available, in which
 	// case the CVE fields are meaningless and the reporter prints "n/a".
@@ -127,7 +127,7 @@ func ParseSeverity(v string) (Severity, error) {
 	return sev, nil
 }
 
-// Confidence says how sure dtrim is that applying a rule's fix is safe.
+// Confidence says how sure docker-trim is that applying a rule's fix is safe.
 //
 // It gates auto-fixing: --aggressiveness safe applies only Safe rules, likely
 // applies Safe and Likely, aggressive applies everything.
@@ -156,7 +156,7 @@ func (c Confidence) Rank() int {
 	return 3
 }
 
-// Finding is one thing dtrim noticed about a Dockerfile or an image.
+// Finding is one thing docker-trim noticed about a Dockerfile or an image.
 type Finding struct {
 	RuleID     string     `json:"ruleId"`
 	Title      string     `json:"title"`

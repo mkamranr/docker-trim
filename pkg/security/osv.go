@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // Vulnerability data from OSV (https://osv.dev).
 //
-// This is opt-in behind --osv for two reasons. It is the only part of dtrim
+// This is opt-in behind --osv for two reasons. It is the only part of docker-trim
 // that sends anything anywhere: the query carries the name and version of every
 // package in the image, which describes that image fairly precisely. And it
 // means a report can differ between two runs for reasons that have nothing to
@@ -42,8 +42,8 @@ const (
 	// osvBatchSize is how many packages one querybatch request covers. The API
 	// accepts a thousand.
 	osvBatchSize = 1000
-	// osvUserAgent identifies dtrim to a free public service.
-	osvUserAgent = "dtrim (https://github.com/mkamranr/dtrim)"
+	// osvUserAgent identifies docker-trim to a free public service.
+	osvUserAgent = "docker-trim (https://github.com/mkamranr/docker-trim)"
 )
 
 // Vulnerability is one known problem with an installed package.
@@ -124,7 +124,7 @@ func OSVEcosystem(rep *analyzer.ImageReport) (string, error) {
 		}
 		return "Alpine:v" + version, nil
 	}
-	return "", fmt.Errorf("dtrim does not know how to look up %q packages in OSV; "+
+	return "", fmt.Errorf("docker-trim does not know how to look up %q packages in OSV; "+
 		"Debian, Ubuntu and Alpine are supported", id)
 }
 

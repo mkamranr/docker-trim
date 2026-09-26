@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // Render writes an Analysis back out as Dockerfile source.
 //
 // An instruction that still carries its captured source text is emitted
-// byte-for-byte, so anything dtrim did not touch survives untouched, including
+// byte-for-byte, so anything docker-trim did not touch survives untouched, including
 // heredocs, line continuations and whatever spacing the author preferred. Only
 // instructions a rule rewrote, or the synthesizer created, are rendered from
 // their parts. The output must parse: TestRender_output_reparses enforces it.
@@ -135,8 +135,8 @@ func splitOnAnd(args []string) [][]string {
 	return out
 }
 
-// comment builds a dtrim annotation explaining a change it made. Every line the
+// comment builds a docker-trim annotation explaining a change it made. Every line the
 // synthesizer adds or rewrites carries one, so the diff explains itself.
 func comment(ruleID, why string) string {
-	return "# dtrim(" + ruleID + "): " + why
+	return "# docker-trim(" + ruleID + "): " + why
 }

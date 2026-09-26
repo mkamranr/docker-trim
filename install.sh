@@ -1,15 +1,15 @@
 #!/bin/sh
-# Install dtrim.
+# Install docker-trim.
 #
-#   curl -fsSL https://raw.githubusercontent.com/mkamranr/dtrim/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/mkamranr/docker-trim/main/install.sh | sh
 #
 # Environment:
-#   DTRIM_VERSION   version to install, without the leading v (default: latest release)
-#   DTRIM_BIN_DIR   where to put the binary (default: /usr/local/bin, else ~/.local/bin)
+#   DOCKER_TRIM_VERSION   version to install, without the leading v (default: latest release)
+#   DOCKER_TRIM_BIN_DIR   where to put the binary (default: /usr/local/bin, else ~/.local/bin)
 set -eu
 
-REPO="mkamranr/dtrim"
-NAME="dtrim"
+REPO="mkamranr/docker-trim"
+NAME="docker-trim"
 
 say() { printf '%s\n' "$*"; }
 die() { printf '%s: %s\n' "$NAME" "$*" >&2; exit 1; }
@@ -40,13 +40,13 @@ case "$arch" in
 esac
 target="${os}-${arch}"
 
-version="${DTRIM_VERSION:-}"
+version="${DOCKER_TRIM_VERSION:-}"
 if [ -z "$version" ]; then
   say "Looking up the latest release..."
   version=$(fetch "https://api.github.com/repos/$REPO/releases/latest" \
     | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' \
     | head -n 1)
-  [ -n "$version" ] || die "could not determine the latest release; set DTRIM_VERSION"
+  [ -n "$version" ] || die "could not determine the latest release; set DOCKER_TRIM_VERSION"
 fi
 
 archive="${NAME}-${version}-${target}.tar.gz"
@@ -79,7 +79,7 @@ tar -xzf "$tmp/$archive" -C "$tmp" || die "could not extract $archive"
 binary=$(find "$tmp" -type f -name "$NAME" -perm -u+x | head -n 1)
 [ -n "$binary" ] || die "no $NAME binary inside $archive"
 
-bindir="${DTRIM_BIN_DIR:-}"
+bindir="${DOCKER_TRIM_BIN_DIR:-}"
 if [ -z "$bindir" ]; then
   if [ -w /usr/local/bin ] 2>/dev/null; then
     bindir=/usr/local/bin

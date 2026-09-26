@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 const fixtures = "../../tests/fixtures"
@@ -20,7 +20,7 @@ func parseFixture(t *testing.T, name string) *analyzer.Analysis {
 	return a
 }
 
-// The load-bearing property: whatever dtrim emits has to be a Dockerfile.
+// The load-bearing property: whatever docker-trim emits has to be a Dockerfile.
 func TestRender_output_reparses(t *testing.T) {
 	entries, err := os.ReadDir(fixtures)
 	if err != nil {

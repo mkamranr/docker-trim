@@ -23,7 +23,7 @@ type Usage struct {
 	RemovableBytes int64 `json:"removableBytes"`
 	// LanguagePackages counts the PyPI and npm packages in the image, which are
 	// reported and scanned for vulnerabilities but never classified as
-	// removable: dtrim edits Dockerfiles, and those arrive through a lockfile.
+	// removable: docker-trim edits Dockerfiles, and those arrive through a lockfile.
 	LanguagePackages int `json:"languagePackages,omitempty"`
 	// Notes record anything that limits how far this should be trusted.
 	Notes []string `json:"notes,omitempty"`
@@ -52,7 +52,7 @@ var neverRemove = map[string]bool{
 //
 // A package with no observed file is reported as unused, which is a statement
 // about the trace and not about the package: it means nothing exercised it
-// while dtrim was watching. Coverage is what tells you how much that is worth,
+// while docker-trim was watching. Coverage is what tells you how much that is worth,
 // and it is why removal is a decision for the person who knows the workload.
 func AttributeUsage(rep *ImageReport, manifest TraceManifest) Usage {
 	var u Usage
@@ -71,7 +71,7 @@ func AttributeUsage(rep *ImageReport, manifest TraceManifest) Usage {
 	}
 
 	// Only operating-system packages take part. A Python or npm package
-	// arrives through requirements.txt or a lockfile, so dtrim could not remove
+	// arrives through requirements.txt or a lockfile, so docker-trim could not remove
 	// it by editing a Dockerfile even if a trace proved nothing used it, and
 	// listing it as removable would be an instruction nobody can follow.
 	//

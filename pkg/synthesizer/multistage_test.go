@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 func optimize(t *testing.T, fixture string, base Base) (*Result, string) {
@@ -200,7 +200,7 @@ func TestOptimize_python_strips_the_build_toolchain(t *testing.T) {
 	if !r.Restructured {
 		t.Fatalf("declined to split a build that installs gcc: %q", r.Plan.Reason)
 	}
-	builder, runtime, ok := strings.Cut(out, "# dtrim(DT100)")
+	builder, runtime, ok := strings.Cut(out, "# docker-trim(DT100)")
 	if !ok {
 		t.Fatalf("no runtime stage emitted:\n%s", out)
 	}
@@ -214,7 +214,7 @@ func TestOptimize_python_strips_the_build_toolchain(t *testing.T) {
 	}
 }
 
-// Nothing to strip means nothing to gain, and dtrim should say so rather than
+// Nothing to strip means nothing to gain, and docker-trim should say so rather than
 // write a file that changes the structure and saves zero bytes.
 func TestOptimize_declines_a_split_that_would_save_nothing(t *testing.T) {
 	a, err := analyzer.Parse(strings.NewReader(
@@ -267,7 +267,7 @@ func TestOptimize_go_builds_static_for_every_base(t *testing.T) {
 }
 
 // Rust has no equivalent switch: a musl build needs an explicit target, and
-// dtrim will not quietly invent one.
+// docker-trim will not quietly invent one.
 func TestOptimize_rust_declines_alpine_without_a_musl_target(t *testing.T) {
 	r, _ := optimize(t, "rust-cli.Dockerfile", BaseAlpine)
 	if r.Restructured {
@@ -290,7 +290,7 @@ func TestOptimize_declines_scratch_for_interpreted_languages(t *testing.T) {
 	}
 }
 
-// Whatever dtrim emits, running dtrim on it again must not keep changing it.
+// Whatever docker-trim emits, running docker-trim on it again must not keep changing it.
 func TestOptimize_is_stable_under_a_second_pass(t *testing.T) {
 	for _, fixture := range []string{"go-api.Dockerfile", "node-express.Dockerfile", "unknown-ecosystem.Dockerfile"} {
 		t.Run(fixture, func(t *testing.T) {
@@ -324,7 +324,7 @@ func TestOptimize_every_runtime_stage_drops_privileges(t *testing.T) {
 
 // A multi-stage file builds in one stage and ships from a minimal one, so
 // looking only at the final stage reports "unrecognised" for projects whose
-// language is obvious. dtrim's own Dockerfile is the case that found this.
+// language is obvious. docker-trim's own Dockerfile is the case that found this.
 func TestDetectEcosystem_looks_past_a_minimal_final_stage(t *testing.T) {
 	a, err := analyzer.Parse(strings.NewReader(
 		"FROM golang:1.24-alpine AS builder\nWORKDIR /src\nCOPY . .\nRUN go build -o /src/bin/app .\n\n" +

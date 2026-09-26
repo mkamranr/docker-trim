@@ -5,13 +5,13 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mkamranr/dtrim/pkg/dtrim"
+	"github.com/mkamranr/docker-trim/pkg/trim"
 )
 
 // Diff writes a unified diff between the original Dockerfile and the trimmed
-// one, so a reviewer can see every line dtrim changed rather than taking the
+// one, so a reviewer can see every line docker-trim changed rather than taking the
 // summary on trust.
-func Diff(w io.Writer, rep *dtrim.Report, opt Options) error {
+func Diff(w io.Writer, rep *trim.Report, opt Options) error {
 	df := rep.Dockerfile
 	if df == nil || df.Trimmed == "" || df.Trimmed == df.Original {
 		return nil
@@ -43,9 +43,9 @@ func Diff(w io.Writer, rep *dtrim.Report, opt Options) error {
 }
 
 // Markdown writes a report suitable for pasting into a pull request.
-func Markdown(w io.Writer, rep *dtrim.Report) error {
+func Markdown(w io.Writer, rep *trim.Report) error {
 	var b strings.Builder
-	b.WriteString("## dtrim report\n\n")
+	b.WriteString("## docker-trim report\n\n")
 
 	res := rep.Result
 	if res.OriginalSizeBytes > 0 && res.TrimmedSizeBytes > 0 {

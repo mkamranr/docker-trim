@@ -1,8 +1,8 @@
 # ecosystem: unknown
 # restructured: no
-# reason: no recognisable build step, so dtrim cannot tell what the runtime stage would need to copy. Applying cleanups to the single stage instead.
+# reason: no recognisable build step, so docker-trim cannot tell what the runtime stage would need to copy. Applying cleanups to the single stage instead.
 # ---
-# No recognisable build step. dtrim must refuse to invent a builder stage
+# No recognisable build step. docker-trim must refuse to invent a builder stage
 # and fall back to safe cleanups only.
 FROM debian:bookworm
 

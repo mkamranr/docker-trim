@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 //go:embed surface.json
@@ -34,7 +34,7 @@ var rules = func() map[string]Entry {
 	if err := json.Unmarshal(surfaceRules, &rs); err != nil {
 		// The file is embedded at build time and covered by a test, so a
 		// failure here means the binary itself is corrupt.
-		panic("dtrim: embedded surface ruleset is invalid: " + err.Error())
+		panic("docker-trim: embedded surface ruleset is invalid: " + err.Error())
 	}
 	m := make(map[string]Entry, len(rs.Entries))
 	for _, e := range rs.Entries {
@@ -53,7 +53,7 @@ type Item struct {
 // Surface is what an image offers an attacker who gets code execution in it.
 //
 // Score has no absolute meaning; it exists so a before and an after can be
-// compared. dtrim reports the difference, never the number on its own.
+// compared. docker-trim reports the difference, never the number on its own.
 type Surface struct {
 	Items         []Item `json:"items"`
 	Score         int    `json:"score"`
@@ -74,7 +74,7 @@ func (s Surface) ByClass() map[string][]Item {
 
 // Assessment compares an image before and after trimming.
 //
-// CVEKnown is false unless --osv actually looked the packages up. dtrim reports
+// CVEKnown is false unless --osv actually looked the packages up. docker-trim reports
 // what it removed, never a vulnerability count it did not measure.
 type Assessment struct {
 	Original Surface  `json:"original"`
@@ -86,7 +86,7 @@ type Assessment struct {
 	CVEKnown        bool `json:"cveKnown"`
 	OriginalCVEs    int  `json:"originalCVEs"`
 	RemainingCVEs   int  `json:"remainingCVEs"`
-	// Notes explain anything dtrim could not determine.
+	// Notes explain anything docker-trim could not determine.
 	Notes []string `json:"notes,omitempty"`
 }
 
@@ -213,7 +213,7 @@ func Compare(original Surface, trimmed *Surface) Assessment {
 		a.RemovedPackages = n
 	}
 	a.Notes = append(a.Notes,
-		"CVE counts are not reported unless --osv is given: dtrim does not print a "+
+		"CVE counts are not reported unless --osv is given: docker-trim does not print a "+
 			"vulnerability number it has not measured.")
 	return a
 }

@@ -1,11 +1,11 @@
-package dtrim
+package trim
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/security"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/security"
 )
 
 // runOSV looks up the image's packages and folds what it finds into the report.
@@ -63,7 +63,7 @@ func foldVulnerabilities(rep *Report) {
 	// dropping it would make --fail-on look more thorough than it is.
 	if n := unscored(vulns); n > 0 {
 		rep.Notes = append(rep.Notes, fmt.Sprintf(
-			"%d of %d advisories carry no CVSS score dtrim could read, so they are listed but "+
+			"%d of %d advisories carry no CVSS score docker-trim could read, so they are listed but "+
 				"cannot be matched against --fail-on.", n, vulns.Total))
 	}
 }
@@ -71,12 +71,12 @@ func foldVulnerabilities(rep *Report) {
 // scanImage looks up one image's packages.
 //
 // It is separate from the report so the same scan can be run against an image
-// dtrim built rather than the one the user named, which is what turns a count
+// docker-trim built rather than the one the user named, which is what turns a count
 // into a before and after.
 func scanImage(ctx context.Context, cfg Config, img *analyzer.ImageReport) (*security.VulnerabilityReport, error) {
 	progress := func(string) {}
 	if !cfg.Quiet && cfg.Stderr != nil {
-		progress = func(msg string) { _, _ = fmt.Fprintf(cfg.Stderr, "[dtrim] %s\n", msg) }
+		progress = func(msg string) { _, _ = fmt.Fprintf(cfg.Stderr, "[docker-trim] %s\n", msg) }
 	}
 	vulns, err := security.QueryOSV(ctx, img, progress)
 	if err != nil {
@@ -104,7 +104,7 @@ func compareVulnerabilities(ctx context.Context, cfg Config, rep *Report, after 
 	// would quote is exactly the one that would be wrong.
 	if len(after.Packages) == 0 {
 		rep.Notes = append(rep.Notes, fmt.Sprintf(
-			"%s has no package inventory dtrim can read, so its advisories could not be "+
+			"%s has no package inventory docker-trim can read, so its advisories could not be "+
 				"counted. That is not the same as having none, and no reduction is claimed.", label))
 		rep.Result.RemainingCVEsKnown = false
 		return nil
@@ -128,7 +128,7 @@ func compareVulnerabilities(ctx context.Context, cfg Config, rep *Report, after 
 
 // vulnFindings turns advisories into findings so one gate covers both.
 //
-// Only advisories with a severity dtrim could read become findings. One with no
+// Only advisories with a severity docker-trim could read become findings. One with no
 // readable CVSS vector is still counted and listed, but it cannot be placed in
 // a band, and inventing a band for it would make --fail-on fire or stay silent
 // on a guess.

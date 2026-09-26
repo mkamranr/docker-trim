@@ -12,15 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/synthesizer"
-	"github.com/mkamranr/dtrim/pkg/tracer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/synthesizer"
+	"github.com/mkamranr/docker-trim/pkg/tracer"
 )
 
 func requireDocker(t *testing.T) context.Context {
 	t.Helper()
-	if os.Getenv("DTRIM_INTEGRATION") == "" {
-		t.Skip("set DTRIM_INTEGRATION=1 to run tests that build real images")
+	if os.Getenv("DOCKER_TRIM_INTEGRATION") == "" {
+		t.Skip("set DOCKER_TRIM_INTEGRATION=1 to run tests that build real images")
 	}
 	ctx := context.Background()
 	if err := tracer.Available(ctx); err != nil {
@@ -47,7 +47,7 @@ func buildImage(t *testing.T, tag, dockerfile string) {
 // nothing in the Dockerfile mentions them.
 func TestProcTracer_sees_binaries_and_dynamically_loaded_libraries(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:python"
+	const tag = "docker-trim-trace-it:python"
 	// The import has to stay resident long enough to be sampled. A command that
 	// imports and exits immediately is a coin flip: on a fast runner the whole
 	// dlopen phase can fall between two samples, which is the limitation
@@ -101,12 +101,12 @@ func TestProcTracer_sees_binaries_and_dynamically_loaded_libraries(t *testing.T)
 	}
 }
 
-// Sampling races with a short-lived process, so dtrim has to report how long
+// Sampling races with a short-lived process, so docker-trim has to report how long
 // the command ran: without it, a user cannot tell a thorough trace from one
 // that saw two frames of a forty-millisecond process.
 func TestProcTracer_reports_how_long_the_command_ran(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:duration"
+	const tag = "docker-trim-trace-it:duration"
 	buildImage(t, tag, "FROM busybox:1.37\nCMD [\"sleep\",\"2\"]\n")
 
 	tr, _ := tracer.New(tracer.BackendProc)
@@ -132,7 +132,7 @@ func TestProcTracer_reports_how_long_the_command_ran(t *testing.T) {
 // output. A sensor that alters behaviour is worse than no sensor.
 func TestProcTracer_is_transparent_to_the_container(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:exit"
+	const tag = "docker-trim-trace-it:exit"
 	buildImage(t, tag, "FROM busybox:1.37\nCMD [\"sh\",\"-c\",\"echo hello from the app; exit 7\"]\n")
 
 	tr, _ := tracer.New(tracer.BackendProc)
@@ -153,7 +153,7 @@ func TestProcTracer_is_transparent_to_the_container(t *testing.T) {
 // normal path, not an error.
 func TestProcTracer_stops_a_long_running_container_and_still_reports(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:server"
+	const tag = "docker-trim-trace-it:server"
 	buildImage(t, tag, "FROM busybox:1.37\nCMD [\"sh\",\"-c\",\"while true; do sleep 1; done\"]\n")
 
 	tr, _ := tracer.New(tracer.BackendProc)
@@ -180,7 +180,7 @@ func TestProcTracer_stops_a_long_running_container_and_still_reports(t *testing.
 // The whole point: a trace plus a package inventory says what is not being used.
 func TestTrace_attributes_unused_packages(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:toolchain"
+	const tag = "docker-trim-trace-it:toolchain"
 	buildImage(t, tag, "FROM debian:bookworm-slim\n"+
 		"RUN apt-get update && apt-get install -y --no-install-recommends vim-tiny curl "+
 		"&& rm -rf /var/lib/apt/lists/*\n"+
@@ -229,7 +229,7 @@ func TestTrace_attributes_unused_packages(t *testing.T) {
 // traced twice produces the same answer. The sampler does not, and cannot.
 func TestPtraceTracer_is_deterministic_where_sampling_is_not(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:determinism"
+	const tag = "docker-trim-trace-it:determinism"
 	// Short enough that the sampler races with it, which is the point.
 	buildImage(t, tag, "FROM python:3.12-slim\nCMD [\"python\",\"-c\",\"import json,ssl,sqlite3;print('ok')\"]\n")
 
@@ -276,7 +276,7 @@ func TestPtraceTracer_is_deterministic_where_sampling_is_not(t *testing.T) {
 // file the program looked for and did not find is never counted as used.
 func TestPtraceTracer_ignores_files_that_were_not_there(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:missing"
+	const tag = "docker-trim-trace-it:missing"
 	buildImage(t, tag, "FROM busybox:1.37\n"+
 		"CMD [\"sh\",\"-c\",\"cat /definitely/not/here 2>/dev/null; cat /etc/hostname >/dev/null\"]\n")
 
@@ -302,7 +302,7 @@ func TestPtraceTracer_ignores_files_that_were_not_there(t *testing.T) {
 // syscall entry and exit pairing wrong silently drops the child's file access.
 func TestPtraceTracer_follows_forked_children(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:fork"
+	const tag = "docker-trim-trace-it:fork"
 	buildImage(t, tag, "FROM python:3.12-slim\n"+
 		"CMD [\"/bin/sh\",\"-c\",\"python -c 'import sqlite3'\"]\n")
 
@@ -331,7 +331,7 @@ func TestPtraceTracer_follows_forked_children(t *testing.T) {
 // Whatever the backend, the wrapper must not change what the container does.
 func TestPtraceTracer_is_transparent_to_the_container(t *testing.T) {
 	ctx := requireDocker(t)
-	const tag = "dtrim-trace-it:ptexit"
+	const tag = "docker-trim-trace-it:ptexit"
 	buildImage(t, tag, "FROM busybox:1.37\nCMD [\"sh\",\"-c\",\"echo hello; exit 9\"]\n")
 
 	tr, _ := tracer.New(tracer.BackendPtrace)
@@ -348,12 +348,12 @@ func TestPtraceTracer_is_transparent_to_the_container(t *testing.T) {
 	}
 }
 
-// The failure dtrim is most capable of causing, and the reason the tracer feeds
+// The failure docker-trim is most capable of causing, and the reason the tracer feeds
 // the synthesizer: an image that is dramatically smaller, builds cleanly, and
 // dies the first time the program shells out. Static analysis cannot see it.
 //
 // This builds the broken image on purpose and confirms both that it is broken
-// and that dtrim said so in advance.
+// and that docker-trim said so in advance.
 func TestTrace_warns_before_a_rewrite_breaks_the_program(t *testing.T) {
 	ctx := requireDocker(t)
 	dir := t.TempDir()
@@ -370,7 +370,7 @@ func TestTrace_warns_before_a_rewrite_breaks_the_program(t *testing.T) {
 	write("Dockerfile", "FROM golang:1.25-alpine\nWORKDIR /src\nCOPY . .\n"+
 		"RUN go build -o /src/bin/app .\nCMD [\"/src/bin/app\"]\n")
 
-	const tag = "dtrim-trace-it:shellout"
+	const tag = "docker-trim-trace-it:shellout"
 	out, err := exec.Command("docker", "build", "-q", "-t", tag, dir).CombinedOutput()
 	if err != nil {
 		t.Fatalf("building the fixture: %v\n%s", err, out)
@@ -401,7 +401,7 @@ func TestTrace_warns_before_a_rewrite_breaks_the_program(t *testing.T) {
 		t.Fatalf("declined to restructure: %s", plan.Plan.Reason)
 	}
 	if len(plan.RuntimeGaps) == 0 {
-		t.Fatal("the program shells out and the runtime has no shell, but dtrim did not say so")
+		t.Fatal("the program shells out and the runtime has no shell, but docker-trim did not say so")
 	}
 	var named bool
 	for _, g := range plan.RuntimeGaps {
@@ -413,12 +413,12 @@ func TestTrace_warns_before_a_rewrite_breaks_the_program(t *testing.T) {
 		t.Errorf("the gaps do not name a shell: %+v", plan.RuntimeGaps)
 	}
 
-	// Now prove the warning was right, rather than taking dtrim's word for it.
+	// Now prove the warning was right, rather than taking docker-trim's word for it.
 	trimmedPath := filepath.Join(dir, "Dockerfile.trimmed")
 	if err := os.WriteFile(trimmedPath, []byte(synthesizer.Render(a)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	const trimTag = "dtrim-trace-it:shellout-trimmed"
+	const trimTag = "docker-trim-trace-it:shellout-trimmed"
 	t.Cleanup(func() { tracer.Remove(context.Background(), trimTag) })
 	if _, err := tracer.Build(ctx, tracer.BuildRequest{
 		Dockerfile: trimmedPath, Context: dir, Tag: trimTag}); err != nil {

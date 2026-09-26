@@ -1,34 +1,36 @@
-// Command dtrim analyzes container images and Dockerfiles, and rewrites
+// Command docker-trim analyzes container images and Dockerfiles, and rewrites
 // single-stage builds into minimal multi-stage ones.
 //
 // This file is the command-line surface and nothing else: it maps flags onto a
-// dtrim.Config, runs the pipeline, and renders the result. All of the work
+// trim.Config, runs the pipeline, and renders the result. All of the work
 // lives in the library, which carries no dependency on cobra so it can be used
 // directly; see docs/library.md.
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/mkamranr/dtrim/internal/version"
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/dtrim"
-	"github.com/mkamranr/dtrim/pkg/reporter"
+	"github.com/mkamranr/docker-trim/internal/version"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/reporter"
+	"github.com/mkamranr/docker-trim/pkg/trim"
 )
 
 // Exit codes follow the convention every linter uses: 0 is a clean run, 1 means
 // the tool worked and did not like what it found, 2 means the tool itself could
 // not do its job. Keeping those apart is what lets a pipeline tell "your
-// Dockerfile ships a shell" from "dtrim crashed".
+// Dockerfile ships a shell" from "docker-trim crashed".
 const (
 	exitOK       = 0
 	exitFindings = 1
@@ -48,13 +50,14 @@ func run() int {
 	// failure, and cobra would print it as one.
 	var gateFailed bool
 	cmd := newRootCommand(&gateFailed)
+	cmd.SetArgs(commandLine())
 
 	if err := cmd.ExecuteContext(ctx); err != nil {
 		if errors.Is(err, context.Canceled) {
-			fmt.Fprintln(os.Stderr, "dtrim: interrupted")
+			fmt.Fprintln(os.Stderr, "docker-trim: interrupted")
 			return exitError
 		}
-		fmt.Fprintf(os.Stderr, "dtrim: %v\n", err)
+		fmt.Fprintf(os.Stderr, "docker-trim: %v\n", err)
 		return exitError
 	}
 	if gateFailed {
@@ -91,9 +94,9 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	var f flags
 
 	cmd := &cobra.Command{
-		Use:   "dtrim [flags] [DOCKERFILE_PATH or IMAGE_NAME]",
+		Use:   "docker-trim [flags] [DOCKERFILE_PATH or IMAGE_NAME]",
 		Short: "Shrink container images and cut their attack surface",
-		Long: "dtrim analyzes Dockerfiles and built images, reports where the bytes and the\n" +
+		Long: "docker-trim analyzes Dockerfiles and built images, reports where the bytes and the\n" +
 			"attack surface come from, and rewrites single-stage builds into minimal\n" +
 			"multi-stage ones.\n\n" +
 			"It never reports a size it did not measure: pass --verify to have it build both\n" +
@@ -103,20 +106,20 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 		SilenceErrors: true,
 		Version:       version.String(),
 		Example: strings.Join([]string{
-			"  dtrim --file ./Dockerfile --optimize --output Dockerfile.min",
-			"  dtrim --file ./Dockerfile --optimize --base distroless --verify",
-			"  dtrim --analyze-only myapp:latest",
-			"  dtrim --analyze-only myapp:latest --quiet | jq .image.categories",
-			"  dtrim --analyze-only --fail-on high   # exits 1 if the image ships a shell",
-			"  dtrim --image myapp:latest --tracer proc --trace \"pytest -q\"",
-			"  dtrim --image myapp:v1 --osv --compare myapp:v2   # what the rewrite removed",
+			"  docker-trim --file ./Dockerfile --optimize --output Dockerfile.min",
+			"  docker-trim --file ./Dockerfile --optimize --base distroless --verify",
+			"  docker-trim --analyze-only myapp:latest",
+			"  docker-trim --analyze-only myapp:latest --quiet | jq .image.categories",
+			"  docker-trim --analyze-only --fail-on high   # exits 1 if the image ships a shell",
+			"  docker-trim --image myapp:latest --tracer proc --trace \"pytest -q\"",
+			"  docker-trim --image myapp:v1 --osv --compare myapp:v2   # what the rewrite removed",
 		}, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := configure(cmd, &f, args)
 			if err != nil {
 				return err
 			}
-			rep, err := dtrim.Run(cmd.Context(), cfg)
+			rep, err := trim.Run(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
@@ -155,22 +158,74 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	fl.BoolVar(&f.markdown, "markdown", false, "Emit a Markdown report suitable for a pull request comment")
 	fl.BoolVar(&f.noDiff, "no-diff", false, "Do not print the diff of the rewritten Dockerfile")
 
+	cmd.AddCommand(pluginMetadataCommand())
 	cmd.SetVersionTemplate("{{.Version}}\n")
 	return cmd
 }
 
+// commandLine is the arguments to parse, with Docker's plugin subcommand
+// removed when there is one.
+//
+// The Docker CLI invokes a plugin as `docker-trim trim --flags`, passing the
+// subcommand it matched as the first argument. Left in place it is parsed as a
+// positional argument, so `docker trim --analyze-only -f Dockerfile` went
+// looking for an image called "trim".
+//
+// The environment variable is what distinguishes a plugin invocation from
+// someone typing the name themselves; Docker sets it and nothing else does.
+func commandLine() []string {
+	args := os.Args[1:]
+	if os.Getenv("DOCKER_CLI_PLUGIN_ORIGINAL_CLI_COMMAND") == "" {
+		return args
+	}
+	name := strings.TrimPrefix(filepath.Base(os.Args[0]), "docker-")
+	if len(args) > 0 && args[0] == name {
+		return args[1:]
+	}
+	return args
+}
+
+// pluginMetadataCommand makes docker-trim usable as `docker trim`.
+//
+// The Docker CLI treats any executable named docker-<name> in its plugin
+// directory as a subcommand, and asks it for this one hidden command to learn
+// what it is. Answering costs a few lines, and without it Docker reports a
+// binary carrying exactly this naming convention as an invalid plugin, which
+// is a confusing way to greet someone who put it where the name suggests.
+//
+// Install with:
+//
+//	mkdir -p ~/.docker/cli-plugins
+//	ln -s "$(command -v docker-trim)" ~/.docker/cli-plugins/docker-trim
+func pluginMetadataCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:    "docker-cli-plugin-metadata",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]string{
+				"SchemaVersion":    "0.1.0",
+				"Vendor":           "mkamranr",
+				"Version":          version.Version(),
+				"ShortDescription": "Shrink container images and cut their attack surface",
+				"URL":              "https://github.com/mkamranr/docker-trim",
+			})
+		},
+	}
+}
+
 // configure turns the parsed flags into a validated Config.
-func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error) {
-	cfg := dtrim.DefaultConfig()
+func configure(cmd *cobra.Command, f *flags, args []string) (trim.Config, error) {
+	cfg := trim.DefaultConfig()
 	cfg.Stdout = cmd.OutOrStdout()
 	cfg.Stderr = cmd.ErrOrStderr()
 	// Start with no file so the default below can tell "the user said nothing"
-	// from "the user asked for a Dockerfile". Otherwise `dtrim --image x` also
+	// from "the user asked for a Dockerfile". Otherwise `docker-trim --image x` also
 	// analyses whatever Dockerfile happens to be in the working directory.
 	cfg.File = ""
 
 	// A single positional argument is whichever of the two it looks like, so
-	// `dtrim myapp:latest` and `dtrim ./Dockerfile` both do the obvious thing.
+	// `docker-trim myapp:latest` and `docker-trim ./Dockerfile` both do the obvious thing.
 	if len(args) == 1 {
 		if looksLikeDockerfile(args[0]) {
 			cfg.File = args[0]
@@ -189,11 +244,11 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 		cfg.File = "Dockerfile"
 	}
 
-	base, err := dtrim.ParseBase(f.base)
+	base, err := trim.ParseBase(f.base)
 	if err != nil {
 		return cfg, err
 	}
-	tracerBackend, err := dtrim.ParseTracer(f.tracer)
+	tracerBackend, err := trim.ParseTracer(f.tracer)
 	if err != nil {
 		return cfg, err
 	}
@@ -206,7 +261,7 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 	cfg.Quiet = f.quiet
 	cfg.Optimize = f.optimize
 	cfg.Verify = f.verify
-	cfg.Aggressiveness = dtrim.Confidence(f.aggressiveness)
+	cfg.Aggressiveness = trim.Confidence(f.aggressiveness)
 	cfg.OSV = f.osv
 	cfg.Compare = f.compare
 	cfg.Context = f.buildContext
@@ -231,7 +286,7 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 }
 
 // render writes the report in whichever form was asked for.
-func render(cfg dtrim.Config, f *flags, rep *dtrim.Report) error {
+func render(cfg trim.Config, f *flags, rep *trim.Report) error {
 	opt := reporter.Options{NoColor: cfg.NoColor, Verbose: f.verbose, FailOn: cfg.FailOn}
 
 	// --quiet means the JSON report and nothing else, so it can be piped.

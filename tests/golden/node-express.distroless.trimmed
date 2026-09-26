@@ -20,17 +20,17 @@ RUN npm install \
 RUN npm run build
 
 ENV NODE_ENV=production
-# dtrim(DT103): added by dtrim so the runtime stage can be minimal
+# docker-trim(DT103): added by docker-trim so the runtime stage can be minimal
 RUN npm prune --omit=dev
 
-# dtrim(DT100): runtime stage carries the application and nothing else
+# docker-trim(DT100): runtime stage carries the application and nothing else
 FROM gcr.io/distroless/nodejs18-debian12:nonroot
 WORKDIR /app
-# dtrim(DT101): only the build output crosses the stage boundary
+# docker-trim(DT101): only the build output crosses the stage boundary
 COPY --from=builder --chown=nonroot:nonroot /app /app
 ENV NODE_ENV=production
 EXPOSE 3000
-# dtrim(DT010): drop privileges before the process starts
+# docker-trim(DT010): drop privileges before the process starts
 USER nonroot:nonroot
-# dtrim(DT102): gcr.io/distroless/nodejs18-debian12:nonroot supplies the interpreter as its entrypoint
+# docker-trim(DT102): gcr.io/distroless/nodejs18-debian12:nonroot supplies the interpreter as its entrypoint
 CMD ["dist/server.js"]

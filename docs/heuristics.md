@@ -1,9 +1,9 @@
 # Heuristics
 
-> Two rules hold for every rewrite dtrim emits:
+> Two rules hold for every rewrite docker-trim emits:
 >
 > **1. The output parses.** Whatever comes out is a Dockerfile, verified by re-parsing it.
-> **2. dtrim never prints a size it did not measure.** Without `--verify`, every number is
+> **2. docker-trim never prints a size it did not measure.** Without `--verify`, every number is
 > labelled `estimated`.
 
 A tool that rewrites your build has exactly one chance to be trusted. Everything below
@@ -22,19 +22,19 @@ Every rule declares how sure it is that applying its fix is safe.
 `--aggressiveness` (default `likely`) sets the ceiling. Rules above it still report; they
 just do not act.
 
-## When dtrim does nothing
+## When docker-trim does nothing
 
 **The file already builds in stages.** The author has already made the layering decisions,
 and rearranging them is how a tool like this breaks someone's build. Cleanups still apply;
 the structure is not touched.
 
 **The build is unrecognisable.** No `go build`, `npm`, `pip`, `cargo`, `mvn` or `gradle`
-means dtrim cannot tell what the runtime stage would need to copy. It says so and applies
+means docker-trim cannot tell what the runtime stage would need to copy. It says so and applies
 cleanups only, rather than inventing a builder stage.
 
 **The split would save nothing.** If the runtime base would be the same image as the builder
 base and the build installs no extra system packages, both stages start from the same bytes.
-dtrim reports that instead of writing a file that changes the structure and saves zero.
+docker-trim reports that instead of writing a file that changes the structure and saves zero.
 
 **The runtime cannot host the artifact.** Node, Python and Java on `scratch`; Rust on alpine
 without a musl target. Each is declined with the specific reason and the specific fix.
@@ -44,15 +44,15 @@ without a musl target. Each is declined with the specific reason and the specifi
 This is where a naive rewrite produces an image that builds, starts, and then fails.
 
 **Alpine is musl, not glibc.** Anything compiled against the builder's glibc will not load
-there. So when you ask for `--base alpine`, dtrim moves the *builder* to alpine too, rather
+there. So when you ask for `--base alpine`, docker-trim moves the *builder* to alpine too, rather
 than handing you a warning and a broken image. Python wheels and node-gyp modules are then
 compiled against the libc that will actually run them.
 
-**Go is the exception**, because a static binary runs on all three targets. dtrim sets
+**Go is the exception**, because a static binary runs on all three targets. docker-trim sets
 `CGO_ENABLED=0` in the builder for every base. If a project genuinely needs cgo, that line is
 the one to remove, and the runtime base has to match the builder's libc.
 
-**Rust needs an explicit musl target.** dtrim will not add `--target
+**Rust needs an explicit musl target.** docker-trim will not add `--target
 x86_64-unknown-linux-musl` on your behalf, because that changes what the compiler produces
 and can need dependencies the build does not have. It declines and tells you the flag.
 
@@ -72,7 +72,7 @@ On the 3.11.16 builder that marker is false, so pip does not install `async-time
 starts. It dies on the first import. Compiled wheels have the same problem one level down, at
 the ABI.
 
-So dtrim keeps the runtime stage on the interpreter the build ran against. Python's saving
+So docker-trim keeps the runtime stage on the interpreter the build ran against. Python's saving
 comes from leaving the build toolchain behind, which is real — 571 MB to 128 MB on the sample
 project — just not from changing base image.
 
@@ -81,7 +81,7 @@ project — just not from changing base image.
 Several minimal bases supply their own entrypoint, and repeating it runs the interpreter
 twice. These were read from the published image configurations, not assumed:
 
-| Base | Entrypoint | What dtrim emits |
+| Base | Entrypoint | What docker-trim emits |
 | :--- | :--- | :--- |
 | `distroless/nodejs<N>` | `/nodejs/bin/node` | `CMD ["dist/server.js"]`, with `node` stripped |
 | `distroless/java<N>` | `/usr/bin/java -jar` | `CMD ["/path/app.jar"]`, with `java` and `-jar` stripped |
@@ -93,11 +93,11 @@ A minimal runtime is only correct if the program never needed what was removed. 
 analysis cannot tell: nothing in a Dockerfile says "this service shells out to `curl` in its
 error path". A trace can, and when one is available the synthesizer uses it.
 
-If the trace saw a binary execute that the chosen runtime will not contain, dtrim reports it
+If the trace saw a binary execute that the chosen runtime will not contain, docker-trim reports it
 as a **runtime gap** before you build:
 
 ```console
-$ dtrim --image myapp:latest -f Dockerfile --tracer ptrace --optimize
+$ docker-trim --image myapp:latest -f Dockerfile --tracer ptrace --optimize
 Runtime gaps
   the trace saw these run, and the new base will not have them
   ! The trace saw `/bin/sh` executed, but a distroless base has no shell and no general
@@ -122,7 +122,7 @@ are easy to get wrong in a way that looks like it worked:
 
 **It removes them from the install, rather than purging them afterwards.** A purge in a later
 `RUN` cannot shrink an earlier layer, so appending one makes the image *larger* while
-appearing to clean up. dtrim reports exactly that as `DT002` in other people's Dockerfiles.
+appearing to clean up. docker-trim reports exactly that as `DT002` in other people's Dockerfiles.
 
 **It only ever touches a stage that ships, never a builder.** A trace observes the finished
 image running, so it knows nothing about what compiling it required — the compiler a builder
@@ -131,9 +131,9 @@ declines single-stage files outright: there, one install serves both the build a
 runtime, and no runtime trace can separate them.
 
 What is left is the final stage of a file that already builds in stages, which is exactly the
-case where dtrim otherwise says "I left the structure alone". Pair it with `--verify`.
+case where docker-trim otherwise says "I left the structure alone". Pair it with `--verify`.
 
-## What dtrim deliberately does not do
+## What docker-trim deliberately does not do
 
 - **It does not reorder your instructions.** `COPY . .` before a dependency install is
   reported, never silently moved: the correct rewrite depends on which files the install
@@ -142,12 +142,12 @@ case where dtrim otherwise says "I left the structure alone". Pair it with `--ve
   decision about your supply chain, not a formatting fix.
 - **It does not treat a Python or npm package as removable, ever.** They are inventoried and
   scanned, but never appear in the "never touched" list and never reach `--prune-unused`.
-  dtrim edits Dockerfiles, and those packages arrive through a lockfile, so a suggestion to
+  docker-trim edits Dockerfiles, and those packages arrive through a lockfile, so a suggestion to
   remove one is an instruction nobody can follow. It also avoids a real hazard: a PyPI
   package sharing a name with an OS one could otherwise get that OS package stripped from an
   `apt-get install` line on evidence about something else entirely.
 - **It does not remove packages unless you ask.** A trace reports what went unused;
-  `--prune-unused` acts on it, and without that flag dtrim deletes nothing. A trace only
+  `--prune-unused` acts on it, and without that flag docker-trim deletes nothing. A trace only
   covers the code paths you exercised, and the package that goes unused all week is the one
   your error handler needs.
 - **It does not rewrite an already multi-stage file.**

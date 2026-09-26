@@ -1,17 +1,17 @@
 //go:build corpus
 
-// A survey of dtrim against real Dockerfiles.
+// A survey of docker-trim against real Dockerfiles.
 //
 // The rest of the test suite uses fixtures this project wrote, which is a
-// friendly corpus: it contains the shapes dtrim was designed for and none of
+// friendly corpus: it contains the shapes docker-trim was designed for and none of
 // the ones nobody thought of. This runs the same guarantees against files
-// written by strangers, and reports what fraction of them dtrim can actually
+// written by strangers, and reports what fraction of them docker-trim can actually
 // handle.
 //
 // It is not a pass/fail gate. It prints a survey, and fails only on the things
 // that are always bugs: a panic, or output that does not parse.
 //
-//	DTRIM_CORPUS=tests/corpus go test -tags corpus ./tests/ -run Corpus -v
+//	DOCKER_TRIM_CORPUS=tests/corpus go test -tags corpus ./tests/ -run Corpus -v
 package tests
 
 import (
@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/synthesizer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/synthesizer"
 )
 
 type outcome struct {
@@ -41,9 +41,9 @@ type outcome struct {
 }
 
 func TestCorpus(t *testing.T) {
-	dir := os.Getenv("DTRIM_CORPUS")
+	dir := os.Getenv("DOCKER_TRIM_CORPUS")
 	if dir == "" {
-		t.Skip("set DTRIM_CORPUS to a directory of real Dockerfiles")
+		t.Skip("set DOCKER_TRIM_CORPUS to a directory of real Dockerfiles")
 	}
 	files, err := filepath.Glob(filepath.Join(dir, "*"))
 	if err != nil {
@@ -69,7 +69,7 @@ func TestCorpus(t *testing.T) {
 	}
 }
 
-// survey runs every guarantee dtrim claims against one file.
+// survey runs every guarantee docker-trim claims against one file.
 func survey(path string, base synthesizer.Base) (res outcome) {
 	res.file = filepath.Base(path)
 
@@ -94,12 +94,12 @@ func survey(path string, base synthesizer.Base) (res outcome) {
 	res.stages = len(a.Stages)
 	res.ecosystem = string(synthesizer.DetectEcosystem(a))
 
-	// Claim 1: a file dtrim has not changed comes back byte for byte.
+	// Claim 1: a file docker-trim has not changed comes back byte for byte.
 	if got := synthesizer.Render(a); got != string(src) {
 		res.lossy = true
 	}
 
-	// Claim 2: whatever dtrim emits is a Dockerfile.
+	// Claim 2: whatever docker-trim emits is a Dockerfile.
 	plan := synthesizer.Optimize(a, synthesizer.Options{
 		Base:           base,
 		Aggressiveness: analyzer.ConfidenceLikely,
@@ -176,7 +176,7 @@ func report(t *testing.T, results []outcome) {
 		t.Errorf("LOSSY ROUND TRIP for %s: rendering an unmodified file changed it", r.file)
 	}
 
-	// A parse failure may be the file's fault rather than dtrim's, so these are
+	// A parse failure may be the file's fault rather than docker-trim's, so these are
 	// reported without failing.
 	for _, r := range parseFailed {
 		t.Logf("  could not parse %s: %v", r.file, r.parseErr)

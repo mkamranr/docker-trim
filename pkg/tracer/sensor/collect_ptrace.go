@@ -36,7 +36,7 @@ const (
 	// ptraceEventExit is the stop that option produces.
 	ptraceEventExit = 6
 
-	// Open flags, from asm-generic and the same on every architecture dtrim
+	// Open flags, from asm-generic and the same on every architecture docker-trim
 	// builds the sensor for.
 	oCreat     = 0o100
 	oDirectory = 0o200000

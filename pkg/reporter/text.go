@@ -1,4 +1,4 @@
-// Package reporter renders what dtrim found: the terminal summary, the JSON
+// Package reporter renders what docker-trim found: the terminal summary, the JSON
 // report, and the diff between the original Dockerfile and the trimmed one.
 package reporter
 
@@ -11,9 +11,9 @@ import (
 
 	"github.com/dustin/go-humanize"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/dtrim"
-	"github.com/mkamranr/dtrim/pkg/security"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/security"
+	"github.com/mkamranr/docker-trim/pkg/trim"
 )
 
 // rule is the horizontal separator from the PRD's output specification.
@@ -26,7 +26,7 @@ type Options struct {
 	// Verbose prints every finding rather than the top ones.
 	Verbose bool
 	// FailOn, when set, adds the pass or fail line that explains the exit code.
-	FailOn dtrim.Severity
+	FailOn trim.Severity
 }
 
 // palette wraps text in ANSI escapes, or leaves it alone.
@@ -80,7 +80,7 @@ func isTerminal(w io.Writer) bool {
 }
 
 // Text writes the human-readable report in the shape the PRD specifies.
-func Text(w io.Writer, rep *dtrim.Report, opt Options) error {
+func Text(w io.Writer, rep *trim.Report, opt Options) error {
 	p := newPalette(w, opt.NoColor)
 	b := &strings.Builder{}
 
@@ -98,7 +98,7 @@ func Text(w io.Writer, rep *dtrim.Report, opt Options) error {
 
 // writeGate explains a --fail-on failure, naming the rules responsible so the
 // person reading a red pipeline knows what to fix without re-running anything.
-func writeGate(b *strings.Builder, p palette, rep *dtrim.Report, opt Options) {
+func writeGate(b *strings.Builder, p palette, rep *trim.Report, opt Options) {
 	if opt.FailOn == "" {
 		return
 	}
@@ -138,9 +138,9 @@ func plural(word string, n int) string {
 	return word + "s"
 }
 
-// writeProgress emits the `[dtrim] ...` lines that narrate the run.
-func writeProgress(b *strings.Builder, p palette, rep *dtrim.Report) {
-	tag := p.head("[dtrim]")
+// writeProgress emits the `[docker-trim] ...` lines that narrate the run.
+func writeProgress(b *strings.Builder, p palette, rep *trim.Report) {
+	tag := p.head("[docker-trim]")
 
 	if df := rep.Dockerfile; df != nil {
 		what := describeEcosystem(df.Ecosystem)
@@ -180,7 +180,7 @@ func writeProgress(b *strings.Builder, p palette, rep *dtrim.Report) {
 
 // writeTrace reports what running the container showed, and how much of the
 // program that trace actually covered.
-func writeTrace(b *strings.Builder, p palette, rep *dtrim.Report, opt Options) {
+func writeTrace(b *strings.Builder, p palette, rep *trim.Report, opt Options) {
 	t := rep.Trace
 	if t == nil {
 		return
@@ -227,7 +227,7 @@ func writeTrace(b *strings.Builder, p palette, rep *dtrim.Report, opt Options) {
 	}
 }
 
-func writeFindings(b *strings.Builder, p palette, rep *dtrim.Report, opt Options) {
+func writeFindings(b *strings.Builder, p palette, rep *trim.Report, opt Options) {
 	if len(rep.Fixed) > 0 {
 		fmt.Fprintf(b, "\n%s\n", p.bold("Applied"))
 		for _, f := range dedupe(rep.Fixed) {
@@ -252,9 +252,9 @@ func writeFindings(b *strings.Builder, p palette, rep *dtrim.Report, opt Options
 		}
 		mark := p.warn("!")
 		switch f.Severity {
-		case dtrim.SeverityCritical, dtrim.SeverityHigh:
+		case trim.SeverityCritical, trim.SeverityHigh:
 			mark = p.bad("!")
-		case dtrim.SeverityLow, dtrim.SeverityInfo:
+		case trim.SeverityLow, trim.SeverityInfo:
 			mark = p.dim("-")
 		}
 		where := ""
@@ -268,7 +268,7 @@ func writeFindings(b *strings.Builder, p palette, rep *dtrim.Report, opt Options
 
 // writeSummary emits the boxed block the PRD specifies, with the measured or
 // estimated label that keeps the numbers honest.
-func writeSummary(b *strings.Builder, p palette, rep *dtrim.Report) {
+func writeSummary(b *strings.Builder, p palette, rep *trim.Report) {
 	res := rep.Result
 	if res.OriginalSizeBytes == 0 && rep.Security == nil {
 		return
@@ -351,7 +351,7 @@ func writeBloat(b *strings.Builder, p palette, img *analyzer.ImageReport) {
 //
 // This gets its own block above the notes because it is the one thing in the
 // report that predicts a production failure rather than describing a saving.
-func writeGaps(b *strings.Builder, p palette, rep *dtrim.Report) {
+func writeGaps(b *strings.Builder, p palette, rep *trim.Report) {
 	df := rep.Dockerfile
 	if df == nil || len(df.RuntimeGaps) == 0 {
 		return
@@ -363,7 +363,7 @@ func writeGaps(b *strings.Builder, p palette, rep *dtrim.Report) {
 	}
 }
 
-func writeWarnings(b *strings.Builder, p palette, rep *dtrim.Report) {
+func writeWarnings(b *strings.Builder, p palette, rep *trim.Report) {
 	var all []string
 	if df := rep.Dockerfile; df != nil {
 		all = append(all, df.Warnings...)
@@ -459,7 +459,7 @@ func sortedRoots(roots map[string]int) []string {
 // An image whose packages could not be read reports that rather than a zero.
 // It is the number someone would quote, so it is the one that must not be
 // wrong.
-func vulnDelta(p palette, rep *dtrim.Report, before, after *security.VulnerabilityReport) string {
+func vulnDelta(p palette, rep *trim.Report, before, after *security.VulnerabilityReport) string {
 	if !rep.Result.RemainingCVEsKnown {
 		return fmt.Sprintf("%d in %d packages  %s", before.Total, before.Queried,
 			p.dim("(the compared image has no readable inventory, so no reduction is claimed)"))
@@ -481,7 +481,7 @@ func vulnDelta(p palette, rep *dtrim.Report, before, after *security.Vulnerabili
 		p.dim(fmt.Sprintf("(%d and %d packages checked)", before.Queried, after.Queried)))
 }
 
-func baseOf(rep *dtrim.Report, original bool) string {
+func baseOf(rep *trim.Report, original bool) string {
 	df := rep.Dockerfile
 	if df == nil {
 		if rep.Image != nil {
@@ -526,7 +526,7 @@ func stageWord(n int) string {
 
 // dedupe collapses findings that repeat the same rule and detail, which happens
 // when one rule fires on several lines for the same reason.
-func dedupe(in []dtrim.Finding) []dtrim.Finding {
+func dedupe(in []trim.Finding) []trim.Finding {
 	seen := map[string]bool{}
 	out := in[:0:0]
 	for _, f := range in {

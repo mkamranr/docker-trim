@@ -16,11 +16,11 @@ COPY . .
 
 RUN cargo build --release
 
-# dtrim(DT100): runtime stage carries the application and nothing else
+# docker-trim(DT100): runtime stage carries the application and nothing else
 FROM scratch
 WORKDIR /build
-# dtrim(DT101): only the build output crosses the stage boundary
+# docker-trim(DT101): only the build output crosses the stage boundary
 COPY --from=builder --chown=10001:10001 /build/target/release/mytool /build/target/release/mytool
-# dtrim(DT010): drop privileges before the process starts
+# docker-trim(DT010): drop privileges before the process starts
 USER 10001:10001
 ENTRYPOINT ["/build/target/release/mytool"]

@@ -1,4 +1,4 @@
-# Using dtrim as a library
+# Using docker-trim as a library
 
 The command-line surface is a thin wrapper. The library carries no dependency on cobra, so it
 can be driven directly.
@@ -8,16 +8,16 @@ import (
     "context"
     "os"
 
-    "github.com/mkamranr/dtrim/pkg/dtrim"
-    "github.com/mkamranr/dtrim/pkg/reporter"
+    "github.com/mkamranr/docker-trim/pkg/trim"
+    "github.com/mkamranr/docker-trim/pkg/reporter"
 )
 
-cfg := dtrim.DefaultConfig()
+cfg := docker-trim.DefaultConfig()
 cfg.File = "Dockerfile"
 cfg.Optimize = true
-cfg.Base = dtrim.BaseDistroless
+cfg.Base = docker-trim.BaseDistroless
 
-rep, err := dtrim.Run(context.Background(), cfg)
+rep, err := docker-trim.Run(context.Background(), cfg)
 if err != nil {
     return err
 }
@@ -26,7 +26,7 @@ return reporter.Text(os.Stdout, rep, reporter.Options{})
 
 ## Config
 
-`dtrim.DefaultConfig()` returns the defaults from the flag matrix. The fields that matter:
+`docker-trim.DefaultConfig()` returns the defaults from the flag matrix. The fields that matter:
 
 | Field | Meaning |
 | :--- | :--- |
@@ -42,14 +42,14 @@ return reporter.Text(os.Stdout, rep, reporter.Options{})
 
 ## The report
 
-`Run` returns a `*dtrim.Report`, the same structure `--quiet` serialises:
+`Run` returns a `*docker-trim.Report`, the same structure `--quiet` serialises:
 
 ```go
 rep.Result.ReductionRatio   // 0.905
 rep.Result.Measured         // false unless Verify built both images
 rep.Dockerfile.Trimmed      // the rewritten file contents
 rep.Findings                // what is still worth fixing
-rep.Fixed                   // what dtrim repaired
+rep.Fixed                   // what docker-trim repaired
 rep.Image.Categories        // where an inspected image's bytes went
 rep.Security.Summary()      // "Removed 4 unused OS packages, 2 shells, ..."
 ```

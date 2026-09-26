@@ -1,14 +1,23 @@
 # Usage
 
 ```
-dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
+docker-trim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
+```
+
+Linked into `~/.docker/cli-plugins/docker-trim` it is also `docker trim`, with identical
+flags — the Docker CLI treats any executable named `docker-<name>` there as a subcommand:
+
+```sh
+mkdir -p ~/.docker/cli-plugins
+ln -sf "$(command -v docker-trim)" ~/.docker/cli-plugins/docker-trim
+docker trim --image myapp:latest --osv
 ```
 
 A single positional argument is read as a Dockerfile if it is a file on disk or its name
-contains `dockerfile`, and as an image reference otherwise. So `dtrim ./Dockerfile` and
-`dtrim myapp:latest` both do the obvious thing.
+contains `dockerfile`, and as an image reference otherwise. So `docker-trim ./Dockerfile` and
+`docker-trim myapp:latest` both do the obvious thing.
 
-With no arguments at all, dtrim analyzes `./Dockerfile`.
+With no arguments at all, docker-trim analyzes `./Dockerfile`.
 
 ## Flags
 
@@ -22,7 +31,7 @@ An image to inspect. The local Docker daemon is tried first, so an image you jus
 never pushed works; a reference the daemon does not have is fetched from its registry.
 
 ```console
-$ dtrim --analyze-only myapp:latest
+$ docker-trim --analyze-only myapp:latest
 ```
 
 Inspection streams every layer and is bound by how fast the daemon can export the image —
@@ -30,9 +39,9 @@ about 25 MB/s on Docker Desktop. Reading from a registry skips that export and i
 
 ### `--optimize`
 
-Rewrite the Dockerfile and write the result to `--output`. Without it, dtrim only reports.
+Rewrite the Dockerfile and write the result to `--output`. Without it, docker-trim only reports.
 
-If the rewrite would be identical to the input, nothing is written and dtrim says so, rather
+If the rewrite would be identical to the input, nothing is written and docker-trim says so, rather
 than leaving a duplicate file behind.
 
 ### `--output`, `-o` (default `Dockerfile.trimmed`)
@@ -41,7 +50,7 @@ Where the rewritten Dockerfile goes. Parent directories are created.
 
 ### `--base`, `-b` (default `distroless`)
 
-The runtime base for the final stage: `distroless`, `alpine` or `scratch`. dtrim maps this
+The runtime base for the final stage: `distroless`, `alpine` or `scratch`. docker-trim maps this
 onto a concrete image per ecosystem and declines combinations that cannot work —
 [heuristics.md](heuristics.md) lists which and why.
 
@@ -53,8 +62,8 @@ start the trimmed one for fifteen seconds.
 This is what turns an estimate into a number worth quoting. Without it, sizes are labelled
 `estimated`. It needs a working Docker engine and takes as long as two builds.
 
-A container that survives the window has not crashed. It has not been exercised, and dtrim
-does not claim otherwise. A service that needs a database it cannot reach will exit; dtrim
+A container that survives the window has not crashed. It has not been exercised, and docker-trim
+does not claim otherwise. A service that needs a database it cannot reach will exit; docker-trim
 reports that and tells you how to tell it apart from a packaging failure.
 
 ### `--analyze-only`
@@ -72,8 +81,8 @@ Emit the JSON report on stdout and nothing else, so it can be piped. The shape i
 by `schemaVersion`.
 
 ```console
-$ dtrim --analyze-only myapp:latest --quiet | jq '.image.categories'
-$ dtrim --analyze-only --quiet | jq -r '.findings[] | select(.severity=="critical") | .title'
+$ docker-trim --analyze-only myapp:latest --quiet | jq '.image.categories'
+$ docker-trim --analyze-only --quiet | jq -r '.findings[] | select(.severity=="critical") | .title'
 ```
 
 ### `--markdown`
@@ -89,14 +98,14 @@ output during `--verify` instead of a status line.
 ### `--fail-on`
 
 Exit `1` when a finding of the given severity or worse survives: `info`, `low`, `medium`,
-`high` or `critical`. Without it, dtrim reports and exits `0`, because a report is not a
+`high` or `critical`. Without it, docker-trim reports and exits `0`, because a report is not a
 failure unless you asked for one.
 
 Only unfixed findings count. Something `--optimize` repaired is no longer in the file you
 are about to build, so it does not fail the gate.
 
 ```console
-$ dtrim --analyze-only --fail-on high
+$ docker-trim --analyze-only --fail-on high
 ...
 FAIL 6 findings at high or above: DT011, DT010
 $ echo $?
@@ -122,11 +131,11 @@ Run the image and record what it actually uses.
 
 `ptrace` observes every successful `execve` and `openat` rather than sampling, so it sees
 roughly 2.3x more and returns the same answer every run. It costs about twice the runtime on
-a syscall-heavy workload, and needs privileges dtrim applies only to the throwaway container
+a syscall-heavy workload, and needs privileges docker-trim applies only to the throwaway container
 it builds for the trace. See [tracing.md](tracing.md) for the measurements.
 
 ```console
-$ dtrim --image myapp:latest --tracer proc --trace "pytest -q"
+$ docker-trim --image myapp:latest --tracer proc --trace "pytest -q"
 Runtime trace
   Observed            : 45 files, 2 binaries, 39 shared libraries across 2 processes, 42 samples
   Packages exercised  : 9 of 189
@@ -143,9 +152,9 @@ Tracing needs `--image`. It builds an ephemeral copy of that image, which takes 
 first time.
 
 **Read the coverage line before acting on the unused list.** Sampling races with short-lived
-processes, so dtrim reports how long the command ran and says so when that was under a
+processes, so docker-trim reports how long the command ran and says so when that was under a
 second. `docs/heuristics.md` and [tracing.md](tracing.md) explain what it can and cannot see.
-Removal is left to you: dtrim reports what to consider dropping and deletes nothing.
+Removal is left to you: docker-trim reports what to consider dropping and deletes nothing.
 
 ### `--compare`
 
@@ -153,7 +162,7 @@ Measure a second image against the first, so the report shows what a rewrite rem
 than only what the original has. Needs `--osv`.
 
 ```console
-$ dtrim --image myapp:v1 --osv --compare myapp:v2
+$ docker-trim --image myapp:v1 --osv --compare myapp:v2
 Vulnerabilities     : 188 -> 34  -81.9% (199 and 97 packages checked)
 ```
 
@@ -169,7 +178,7 @@ Advisories in the compared image are **informational**. `--fail-on` keeps gating
 named by `--image`: an advisory present in both would otherwise count twice, and one the
 rewrite removed would still fail the build, which punishes the improvement.
 
-An image whose packages dtrim cannot read reports the plain count and says why, rather than a
+An image whose packages docker-trim cannot read reports the plain count and says why, rather than a
 reduction. A `scratch` image contains nothing enumerable, and that is not the same as
 containing nothing vulnerable.
 
@@ -195,7 +204,7 @@ npm — because that is where exploitable vulnerabilities concentrate. A slim ba
 advisories are often low severity and unreachable; a three-year-old Django is not.
 
 ```console
-$ dtrim --analyze-only --image myapp:latest --osv
+$ docker-trim --analyze-only --image myapp:latest --osv
 Vulnerabilities     : 63 in 256 packages  26 high, 25 medium, 4 low, 8 unknown
   npm               : 63 in 238 packages
       185 under /usr/local/lib/node_modules
@@ -210,15 +219,15 @@ otherwise be told it has 238, which is true and useless.
 Advisories become findings, so **`--fail-on` gates on them** without a second threshold:
 
 ```sh
-dtrim --analyze-only --image myapp:latest --osv --fail-on critical
+docker-trim --analyze-only --image myapp:latest --osv --fail-on critical
 ```
 
 Severity comes from the CVSS v3 vector in the advisory, scored with the formula from the
-specification. An advisory carrying no vector dtrim can read is counted and listed as
+specification. An advisory carrying no vector docker-trim can read is counted and listed as
 `unknown`, and deliberately cannot trip `--fail-on`: banding it would mean guessing, and a
 guess here either fires a gate for nothing or stays quiet when it should not.
 
-**This is the only part of dtrim that sends anything anywhere.** The query carries the name
+**This is the only part of docker-trim that sends anything anywhere.** The query carries the name
 and version of every package in the image, which describes that image fairly precisely. It is
 opt-in for that reason. Lookups run six at a time and stop at 600 packages.
 
@@ -231,26 +240,26 @@ deploys.
 **Check a Dockerfile in CI and fail on a baked credential.**
 
 ```sh
-dtrim --analyze-only -f Dockerfile --fail-on critical
+docker-trim --analyze-only -f Dockerfile --fail-on critical
 ```
 
 **Be stricter: refuse anything that ships a shell or runs as root.**
 
 ```sh
-dtrim --analyze-only -f Dockerfile --fail-on high
+docker-trim --analyze-only -f Dockerfile --fail-on high
 ```
 
 **Post a report on a pull request.**
 
 ```sh
-dtrim -f Dockerfile --optimize -o /tmp/Dockerfile.trimmed --markdown > report.md
+docker-trim -f Dockerfile --optimize -o /tmp/Dockerfile.trimmed --markdown > report.md
 gh pr comment "$PR" --body-file report.md
 ```
 
 **Find out where an image's bytes actually went.**
 
 ```sh
-dtrim --analyze-only myapp:latest --quiet \
+docker-trim --analyze-only myapp:latest --quiet \
   | jq '.image | {total: .totalSizeBytes, wasted: .wastedBytes, categories}'
 ```
 
@@ -259,14 +268,14 @@ dtrim --analyze-only myapp:latest --quiet \
 ```sh
 for b in distroless alpine scratch; do
   echo "== $b"
-  dtrim -f Dockerfile --optimize -b "$b" -o "Dockerfile.$b" --no-diff | tail -5
+  docker-trim -f Dockerfile --optimize -b "$b" -o "Dockerfile.$b" --no-diff | tail -5
 done
 ```
 
 **Prove it before you commit it.**
 
 ```sh
-dtrim -f Dockerfile --optimize --verify && mv Dockerfile.trimmed Dockerfile
+docker-trim -f Dockerfile --optimize --verify && mv Dockerfile.trimmed Dockerfile
 ```
 
 ## Exit codes
@@ -275,8 +284,8 @@ dtrim -f Dockerfile --optimize --verify && mv Dockerfile.trimmed Dockerfile
 | ---: | :--- |
 | `0` | Clean run. Without `--fail-on`, this includes a run that reported problems |
 | `1` | `--fail-on` was given and a finding at or above that severity survived, including a vulnerability from `--osv` |
-| `2` | dtrim could not do its job: unreadable file, bad flag, failed build |
+| `2` | docker-trim could not do its job: unreadable file, bad flag, failed build |
 
 `1` and `2` are kept apart on purpose. A pipeline needs to tell "your Dockerfile ships a
-shell" from "dtrim crashed", and collapsing both into one code means a broken tool looks
+shell" from "docker-trim crashed", and collapsing both into one code means a broken tool looks
 like a broken Dockerfile.

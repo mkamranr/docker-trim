@@ -259,7 +259,7 @@ func TestPathAliases(t *testing.T) {
 //
 // A language package has no file list, so it can never appear as used. Left in
 // the classification it would land in Unused unconditionally, inflate the
-// removable total, and tell the user to delete something dtrim cannot remove
+// removable total, and tell the user to delete something docker-trim cannot remove
 // by editing a Dockerfile.
 func TestAttributeUsage_never_calls_a_language_package_removable(t *testing.T) {
 	rep := imageWith(
@@ -274,7 +274,7 @@ func TestAttributeUsage_never_calls_a_language_package_removable(t *testing.T) {
 	for _, bucket := range [][]Package{u.Used, u.Unused, u.Essential} {
 		for _, p := range bucket {
 			if !p.IsOS() {
-				t.Errorf("%s (%s) was classified for removal; dtrim cannot remove it",
+				t.Errorf("%s (%s) was classified for removal; docker-trim cannot remove it",
 					p.Name, p.Ecosystem)
 			}
 		}
@@ -316,7 +316,7 @@ func TestAttributeUsage_name_collision_cannot_remove_an_os_package(t *testing.T)
 // Version, Architecture and little else.
 //
 // Requiring Status, as /var/lib/dpkg/status needs, dropped every package in
-// exactly the images dtrim tells people to move to: libc6 and libssl3, the two
+// exactly the images docker-trim tells people to move to: libc6 and libssl3, the two
 // that carry the advisories, were invisible.
 func TestParseDpkgStanzas_treats_status_d_entries_as_installed(t *testing.T) {
 	const statusD = `Package: libc6

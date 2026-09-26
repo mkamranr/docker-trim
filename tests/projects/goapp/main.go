@@ -1,4 +1,4 @@
-// A minimal HTTP service, used to measure what dtrim actually saves.
+// A minimal HTTP service, used to measure what docker-trim actually saves.
 package main
 
 import (

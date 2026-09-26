@@ -213,7 +213,7 @@ func TestRegistry_ids_are_unique_and_documented(t *testing.T) {
 }
 
 // The manifest-first pattern is what DT007 asks for, so a file that already
-// does it must not be told to do it. dtrim's own Dockerfile is this shape.
+// does it must not be told to do it. docker-trim's own Dockerfile is this shape.
 func TestDT007_stays_quiet_when_dependencies_are_installed_before_the_source_copy(t *testing.T) {
 	good := parseString(t, "FROM golang:1.24-alpine\nWORKDIR /src\n"+
 		"COPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN go build -o /out .\n")
@@ -283,7 +283,7 @@ func TestLint_sorts_the_worst_findings_first(t *testing.T) {
 
 // Google's distroless and Chainguard's images set a non-root user in the image
 // itself and say so in the tag. Flagging them would mean flagging the exact
-// arrangement dtrim recommends, which is how a tool teaches people to ignore it.
+// arrangement docker-trim recommends, which is how a tool teaches people to ignore it.
 func TestDT010_accepts_a_base_image_that_already_drops_privileges(t *testing.T) {
 	quiet := []string{
 		"FROM gcr.io/distroless/static-debian12:nonroot\nCOPY app /app\nCMD [\"/app\"]\n",

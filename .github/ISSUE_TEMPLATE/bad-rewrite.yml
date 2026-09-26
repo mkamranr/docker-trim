@@ -1,28 +1,28 @@
 name: Bad rewrite
-description: dtrim produced a Dockerfile that does not build, does not run, or should not have been changed
+description: docker-trim produced a Dockerfile that does not build, does not run, or should not have been changed
 title: "[rewrite] "
 labels: ["bad-rewrite"]
 body:
   - type: markdown
     attributes:
       value: |
-        This is the most useful issue you can open. dtrim rewrites other people's builds, and
+        This is the most useful issue you can open. docker-trim rewrites other people's builds, and
         the only way it stays trustworthy is if the cases where it gets them wrong come back.
 
         If the rewritten image built but exited, please check the container logs first: a
         service that needs a database it cannot reach will exit on its own, and that is not a
-        dtrim bug. A missing module, a missing shared library or a missing interpreter is.
+        docker-trim bug. A missing module, a missing shared library or a missing interpreter is.
   - type: textarea
     id: input
     attributes:
-      label: The Dockerfile you gave dtrim
+      label: The Dockerfile you gave docker-trim
       render: dockerfile
     validations:
       required: true
   - type: textarea
     id: output
     attributes:
-      label: What dtrim produced
+      label: What docker-trim produced
       render: dockerfile
     validations:
       required: true
@@ -38,13 +38,13 @@ body:
     id: command
     attributes:
       label: The command you ran
-      placeholder: dtrim -f Dockerfile --optimize --base distroless --verify
+      placeholder: docker-trim -f Dockerfile --optimize --base distroless --verify
     validations:
       required: true
   - type: input
     id: version
     attributes:
       label: Version and platform
-      description: Output of `dtrim --version`, plus your Docker version.
+      description: Output of `docker-trim --version`, plus your Docker version.
     validations:
       required: true

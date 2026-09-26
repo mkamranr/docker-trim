@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Measure dtrim's static analysis against the performance target, and report
+# Measure docker-trim's static analysis against the performance target, and report
 # peak memory alongside wall time.
 #
 # The target in the requirements is under 1.5 seconds for static analysis. That
@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-echo "Building dtrim..."
+echo "Building docker-trim..."
 make build >/dev/null
 
 # A Dockerfile far larger than anything real, so the number is a ceiling.
@@ -39,11 +39,11 @@ case "$(uname -s)" in
 esac
 
 echo "=== analyze only ==="
-"${TIME[@]}" ./dtrim --analyze-only -f "$big" --quiet > /dev/null
+"${TIME[@]}" ./docker-trim --analyze-only -f "$big" --quiet > /dev/null
 
 echo
 echo "=== optimize ==="
-"${TIME[@]}" ./dtrim -f "$big" --optimize -o "$tmp/out" --quiet > /dev/null
+"${TIME[@]}" ./docker-trim -f "$big" --optimize -o "$tmp/out" --quiet > /dev/null
 
 echo
 echo "On Darwin the 'maximum resident set size' line is bytes; on Linux it is kilobytes."

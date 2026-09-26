@@ -4,7 +4,7 @@
 
 ## Effect on output
 
-<!-- Does this change the Dockerfile dtrim emits, or the report it prints? If so, paste a
+<!-- Does this change the Dockerfile docker-trim emits, or the report it prints? If so, paste a
      before and after. If not, say "none". -->
 
 ## Checklist

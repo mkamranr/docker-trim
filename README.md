@@ -2,18 +2,18 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-  <img src="assets/logo.svg" alt="dtrim" width="96" height="96">
+  <img src="assets/logo.svg" alt="docker-trim" width="96" height="96">
 </picture>
 
-# dtrim
+# docker-trim
 
 **Shrink container images and cut their attack surface, with numbers you can check.**
 
-[![CI](https://github.com/mkamranr/dtrim/actions/workflows/ci.yml/badge.svg)](https://github.com/mkamranr/dtrim/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/mkamranr/dtrim)](https://github.com/mkamranr/dtrim/releases)
+[![CI](https://github.com/mkamranr/docker-trim/actions/workflows/ci.yml/badge.svg)](https://github.com/mkamranr/docker-trim/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/mkamranr/docker-trim)](https://github.com/mkamranr/docker-trim/releases)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
 [![Go](https://img.shields.io/badge/go-1.25%2B-00ADD8)](https://go.dev)
-[![Size](https://img.shields.io/badge/binary-~14MB-lightgrey)](https://github.com/mkamranr/dtrim/releases)
+[![Size](https://img.shields.io/badge/binary-~14MB-lightgrey)](https://github.com/mkamranr/docker-trim/releases)
 
 [Install](#install) · [What it does](#what-it-actually-does) · [Measured reduction](#measured-reduction) · [Usage](#usage) · [Docs](docs/) · [Contributing](CONTRIBUTING.md)
 
@@ -26,17 +26,17 @@ the rest is a compiler toolchain, a package manager, dev dependencies, apt's ind
 shell. You pay for it on every CI pull, in registry storage, and in the fact that anyone
 who reaches your container finds `curl`, `bash` and `gcc` waiting for them.
 
-`dtrim` reads the Dockerfile, works out what the build actually produces, and rewrites it
+`docker-trim` reads the Dockerfile, works out what the build actually produces, and rewrites it
 as a multi-stage build whose final stage contains the application and nothing else. Then,
 if you ask it to, it builds both images and tells you what really changed.
 
 ```console
-$ dtrim --file ./Dockerfile --optimize --verify
-[dtrim] Analyzed ./Dockerfile (Node.js, single stage)
-[dtrim] Building the original image to measure it...
-[dtrim] Building the trimmed image...
-[dtrim] Created Multi-Stage Dockerfile -> Dockerfile.trimmed
-[dtrim] Built both images; trimmed image still running after 15s
+$ docker-trim --file ./Dockerfile --optimize --verify
+[docker-trim] Analyzed ./Dockerfile (Node.js, single stage)
+[docker-trim] Building the original image to measure it...
+[docker-trim] Building the trimmed image...
+[docker-trim] Created Multi-Stage Dockerfile -> Dockerfile.trimmed
+[docker-trim] Built both images; trimmed image still running after 15s
 -------------------------------------------------------------
 Original Image Size : 1.2 GB    (node:18)
 Optimized Image Size: 118 MB    (gcr.io/distroless/nodejs18-debian12:nonroot)
@@ -60,15 +60,15 @@ Attack Surface      : Removed 4 unused OS packages, 2 shells, 2 package managers
 + && npm cache clean --force
  RUN npm run build
 -CMD ["node", "dist/server.js"]
-+# dtrim(DT103): added by dtrim so the runtime stage can be minimal
++# docker-trim(DT103): added by docker-trim so the runtime stage can be minimal
 +RUN npm prune --omit=dev
 +
-+# dtrim(DT100): runtime stage carries the application and nothing else
++# docker-trim(DT100): runtime stage carries the application and nothing else
 +FROM gcr.io/distroless/nodejs18-debian12:nonroot
 +WORKDIR /app
-+# dtrim(DT101): only the build output crosses the stage boundary
++# docker-trim(DT101): only the build output crosses the stage boundary
 +COPY --from=builder --chown=nonroot:nonroot /app /app
-+# dtrim(DT010): drop privileges before the process starts
++# docker-trim(DT010): drop privileges before the process starts
 +USER nonroot:nonroot
 +CMD ["dist/server.js"]
 ```
@@ -76,28 +76,36 @@ Attack Surface      : Removed 4 unused OS packages, 2 shells, 2 package managers
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mkamranr/dtrim/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mkamranr/docker-trim/main/install.sh | sh
 ```
 
 <details>
 <summary><b>Other ways to install</b></summary>
 
 ```sh
+# As a Docker CLI plugin, so it becomes `docker trim`
+mkdir -p ~/.docker/cli-plugins
+ln -sf "$(command -v docker-trim)" ~/.docker/cli-plugins/docker-trim
+docker trim --analyze-only -f Dockerfile
+
 # Homebrew
-brew install mkamranr/tap/dtrim
+brew install mkamranr/tap/docker-trim
 
 # Go
-go install github.com/mkamranr/dtrim@latest
+go install github.com/mkamranr/docker-trim@latest
 
 # Docker
-docker run --rm -v "$PWD:/work" -w /work ghcr.io/mkamranr/dtrim:latest --analyze-only
+docker run --rm -v "$PWD:/work" -w /work ghcr.io/mkamranr/docker-trim:latest --analyze-only
 
 # From source
-git clone https://github.com/mkamranr/dtrim && cd dtrim && make build
+git clone https://github.com/mkamranr/docker-trim && cd docker-trim && make build
 ```
 
-The install script honours `DTRIM_VERSION` to pin a release and `DTRIM_BIN_DIR` to choose
+The install script honours `DOCKER_TRIM_VERSION` to pin a release and `DOCKER_TRIM_BIN_DIR` to choose
 where the binary lands.
+
+Linked into `~/.docker/cli-plugins` the binary answers to `docker trim`, because the Docker
+CLI treats any executable named `docker-<name>` there as a subcommand.
 
 </details>
 
@@ -136,7 +144,7 @@ get a builder stage invented for it.
 ### How often does the rewrite apply?
 
 Against 66 real Dockerfiles — 24 from projects like Grafana, Airflow, Immich and the official
-images, the rest from one developer's machine — dtrim restructured **23%** of them. The other
+images, the rest from one developer's machine — docker-trim restructured **23%** of them. The other
 three quarters it declined, and the reasons matter more than the number:
 
 | | |
@@ -147,14 +155,14 @@ three quarters it declined, and the reasons matter more than the number:
 | 23% | **restructured** |
 
 So the multi-stage rewrite is the right answer for roughly one Dockerfile in four. For the
-other three, dtrim is a linter and an analyser: it still applies the cleanups, reports where
+other three, docker-trim is a linter and an analyser: it still applies the cleanups, reports where
 an image's bytes and attack surface come from, and with `--tracer` tells you which installed
 packages nothing ever touches.
 
 That corpus is small and skewed — two thirds of it is one person's projects, which makes it
 Python-heavy. Reproduce it with `scripts/fetch-corpus.sh` and check your own numbers. What
 did hold across all 66 files, at every base, was the part that matters: no crashes, no
-unparseable output, and no file changed when dtrim had nothing to change.
+unparseable output, and no file changed when docker-trim had nothing to change.
 
 ## Measured reduction
 
@@ -173,7 +181,7 @@ Measured on 2026-09-22 with Docker 24.0.6. Your numbers will differ; run `--veri
 your own.
 
 The Python figure is the honest one to look at. Its saving comes from leaving the build
-toolchain behind, not from changing base image: dtrim deliberately keeps Python on the same
+toolchain behind, not from changing base image: docker-trim deliberately keeps Python on the same
 interpreter it built against, because moving an installed dependency tree onto a different
 CPython build is how you get an image that starts and then dies on import.
 [`docs/heuristics.md`](docs/heuristics.md) explains why.
@@ -181,7 +189,7 @@ CPython build is how you get an image that starts and then dies on import.
 ## Usage
 
 ```
-dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
+docker-trim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 ```
 
 | Flag | Short | Default | Description |
@@ -208,13 +216,13 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--osv` | | `false` | Look up known vulnerabilities at osv.dev; needs `--image` |
 
 Exit codes: `0` clean, `1` when `--fail-on` was given and something met the threshold, `2`
-when dtrim itself could not run. Full details in [`docs/usage.md`](docs/usage.md).
+when docker-trim itself could not run. Full details in [`docs/usage.md`](docs/usage.md).
 
 As a CI gate:
 
 ```sh
-dtrim --analyze-only --fail-on critical    # refuse a baked credential
-dtrim --analyze-only --fail-on high        # also refuse a shell, or running as root
+docker-trim --analyze-only --fail-on critical    # refuse a baked credential
+docker-trim --analyze-only --fail-on high        # also refuse a shell, or running as root
 ```
 
 ## How it works
@@ -237,17 +245,17 @@ dtrim --analyze-only --fail-on high        # also refuse a shell, or running as 
 
 Two properties hold, and are tested:
 
-- **Whatever dtrim emits parses.** Every fixture, at every base, is re-parsed after rewriting.
-- **A file dtrim did not change comes back byte-for-byte.** Instructions carry their original
+- **Whatever docker-trim emits parses.** Every fixture, at every base, is re-parsed after rewriting.
+- **A file docker-trim did not change comes back byte-for-byte.** Instructions carry their original
   source text, so only what a rule actually rewrote is re-rendered.
 
-And one rule it will not break: **dtrim never prints a size it did not measure.** Without
+And one rule it will not break: **docker-trim never prints a size it did not measure.** Without
 `--verify` the numbers are labelled `estimated`, because a size that came from a guess is
 worse than no size at all.
 
 ## Contributing
 
-The most useful thing you can send is a Dockerfile dtrim rewrote badly. There is an issue
+The most useful thing you can send is a Dockerfile docker-trim rewrote badly. There is an issue
 template for exactly that. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License

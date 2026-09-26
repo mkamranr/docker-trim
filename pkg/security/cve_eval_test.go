@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // The ruleset is embedded at build time, so a malformed file would panic at
@@ -93,7 +93,7 @@ func TestCompare_lists_what_the_rewrite_removed(t *testing.T) {
 		}
 	}
 	if a.CVEKnown {
-		t.Error("CVEKnown must be false until dtrim can actually measure one")
+		t.Error("CVEKnown must be false until docker-trim can actually measure one")
 	}
 	if !strings.Contains(strings.Join(a.Notes, " "), "not reported") {
 		t.Errorf("the report does not say CVE counts are unavailable: %v", a.Notes)

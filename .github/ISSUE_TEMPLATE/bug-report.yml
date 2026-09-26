@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        If dtrim rewrote a Dockerfile badly, please use the **Bad rewrite** template instead.
+        If docker-trim rewrote a Dockerfile badly, please use the **Bad rewrite** template instead.
   - type: textarea
     id: what
     attributes:
@@ -25,6 +25,6 @@ body:
     id: version
     attributes:
       label: Version and platform
-      description: Output of `dtrim --version`.
+      description: Output of `docker-trim --version`.
     validations:
       required: true

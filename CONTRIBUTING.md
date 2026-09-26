@@ -2,10 +2,10 @@
 
 ## The most valuable contribution
 
-**A Dockerfile dtrim rewrote badly.** A rewrite that does not build, an image that starts and
-then dies, a saving that turns out to be a mirage, a file dtrim mangled that it should have
+**A Dockerfile docker-trim rewrote badly.** A rewrite that does not build, an image that starts and
+then dies, a saving that turns out to be a mirage, a file docker-trim mangled that it should have
 left alone. There is a [bad-rewrite issue template](.github/ISSUE_TEMPLATE/bad-rewrite.yml)
-for exactly this. Paste the input, paste what dtrim emitted, and say what broke.
+for exactly this. Paste the input, paste what docker-trim emitted, and say what broke.
 
 This tool rewrites other people's builds. It only gets to keep doing that if the cases where
 it gets things wrong come back.
@@ -15,7 +15,7 @@ it gets things wrong come back.
 | Document | What it covers |
 | :--- | :--- |
 | [docs/usage.md](docs/usage.md) | Flags, recipes, exit codes |
-| [docs/heuristics.md](docs/heuristics.md) | What dtrim will and will not change, and why |
+| [docs/heuristics.md](docs/heuristics.md) | What docker-trim will and will not change, and why |
 | [docs/architecture.md](docs/architecture.md) | The pipeline, and how to add a rule |
 | [docs/library.md](docs/library.md) | The Go API |
 | [docs/tracing.md](docs/tracing.md) | Runtime tracing design |
@@ -23,7 +23,7 @@ it gets things wrong come back.
 ## Setup
 
 ```sh
-git clone https://github.com/mkamranr/dtrim && cd dtrim
+git clone https://github.com/mkamranr/docker-trim && cd docker-trim
 make build
 make test
 ```
@@ -65,7 +65,7 @@ make lint
 ```
 
 **Golden files are reviewed, not regenerated.** `go test ./tests -update` rewrites them, and
-a golden diff is dtrim telling you the Dockerfile it emits has changed. Read every line
+a golden diff is docker-trim telling you the Dockerfile it emits has changed. Read every line
 before accepting it. Reviewing the goldens is how the glibc-builder-with-musl-runtime bug
 was caught before release.
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // Backend names a way of observing a running container.

@@ -19,7 +19,7 @@ import (
 
 // ImageReport is what a built image turned out to contain.
 //
-// Everything here is read by streaming the layer tarballs in process. dtrim
+// Everything here is read by streaming the layer tarballs in process. docker-trim
 // never shells out to skopeo, dive or docker for this: a size report that
 // depends on tools the user may not have is a size report they cannot act on.
 type ImageReport struct {
@@ -55,7 +55,7 @@ type ImageReport struct {
 	User       string   `json:"user"`
 	Entrypoint []string `json:"entrypoint,omitempty"`
 	Cmd        []string `json:"cmd,omitempty"`
-	// Notes record anything dtrim could not determine, such as an unsupported
+	// Notes record anything docker-trim could not determine, such as an unsupported
 	// package database.
 	Notes []string `json:"notes,omitempty"`
 }
@@ -106,9 +106,9 @@ type Package struct {
 
 // IsOS reports whether this is an operating-system package.
 //
-// Only these can be reasoned about for removal: dtrim edits Dockerfiles, and a
+// Only these can be reasoned about for removal: docker-trim edits Dockerfiles, and a
 // Python or npm package arrives through requirements.txt or a lockfile, not
-// through a line dtrim can rewrite.
+// through a line docker-trim can rewrite.
 func (p Package) IsOS() bool { return p.Ecosystem == "" }
 
 // bloatCategories classify a path by why it did not need to ship. Order
@@ -194,7 +194,7 @@ func isToolchain(p string) bool {
 
 // InspectImage reads an image and reports what it contains.
 //
-// The local Docker engine is tried first, so `dtrim --image myapp:latest`
+// The local Docker engine is tried first, so `docker-trim --image myapp:latest`
 // works on an image that was just built and never pushed. A reference the
 // daemon does not have is fetched from its registry instead.
 func InspectImage(ctx context.Context, ref string) (*ImageReport, error) {

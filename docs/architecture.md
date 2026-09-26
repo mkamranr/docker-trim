@@ -24,8 +24,8 @@ the per-package file lists that a plain size report does not need.
 
 | Package | Responsibility |
 | :--- | :--- |
-| `main` | Flags only. Maps them onto a `dtrim.Config` and renders the result. No logic. |
-| `pkg/dtrim` | The library surface and the pipeline driver. Re-exports the PRD's types. |
+| `main` | Flags only. Maps them onto a `docker-trim.Config` and renders the result. No logic. |
+| `pkg/docker-trim` | The library surface and the pipeline driver. Re-exports the PRD's types. |
 | `pkg/analyzer` | Dockerfile parsing, the rule registry, layer inspection, package databases. |
 | `pkg/synthesizer` | Ecosystem detection, base mapping, the multi-stage transform, the emitter. |
 | `pkg/security` | Attack-surface scoring from an embedded ruleset. |
@@ -33,13 +33,13 @@ the per-package file lists that a plain size report does not need.
 | `pkg/tracer` | Docker engine operations: build, measure, start, and the `/proc` sampler that observes a running container. |
 
 The dependency graph runs one way: `analyzer` depends on nothing of ours, `synthesizer`
-depends on `analyzer`, and `dtrim` depends on all of them.
+depends on `analyzer`, and `docker-trim` depends on all of them.
 
 ## Where the PRD's types live
 
 The specification declares `DockerfileAST`, `Instruction`, `TraceManifest` and
 `OptimizationResult` in `package main`. They are defined in `pkg/analyzer`, the leaf every
-stage can import, and re-exported from `pkg/dtrim` as aliases under the specified names. The
+stage can import, and re-exported from `pkg/docker-trim` as aliases under the specified names. The
 declared interface is preserved; the mechanism underneath is the one that avoids an import
 cycle.
 

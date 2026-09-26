@@ -5,14 +5,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // Base is the minimal runtime base image family the trimmed final stage lands
 // on. It is the value of the --base flag.
 type Base string
 
-// The runtime bases dtrim can target.
+// The runtime bases docker-trim can target.
 const (
 	// BaseDistroless is a Google distroless image: no shell, no package
 	// manager, and the smallest option that still carries a libc.
@@ -39,7 +39,7 @@ type Ecosystem string
 // Artifact is one path copied out of the builder stage.
 type Artifact struct{ From, To string }
 
-// The toolchains dtrim can recognise. EcosystemUnknown means it could not tell
+// The toolchains docker-trim can recognise. EcosystemUnknown means it could not tell
 // what the build produces, and so declines to restructure it.
 const (
 	EcosystemGo      Ecosystem = "go"
@@ -53,7 +53,7 @@ const (
 // Plan is the mapping decision for one Dockerfile: which runtime base to land
 // on and what has to travel there from the builder.
 //
-// Supported is false when dtrim could not work out what the build produces. It
+// Supported is false when docker-trim could not work out what the build produces. It
 // then declines to invent a builder split and says why, because emitting a
 // confident multi-stage Dockerfile that does not run is worse than emitting
 // nothing.
@@ -88,13 +88,13 @@ type Plan struct {
 	Cmd            []string
 	// Supported reports whether a multi-stage rewrite is safe to attempt.
 	Supported bool
-	// Reason explains an unsupported plan, or a base dtrim declined to use.
+	// Reason explains an unsupported plan, or a base docker-trim declined to use.
 	Reason string
 	// Warnings are things the author has to know about the rewrite.
 	Warnings []string
 }
 
-// alpineTag and debianDistroless pin the runtime images dtrim emits. They are
+// alpineTag and debianDistroless pin the runtime images docker-trim emits. They are
 // deliberately explicit: a tool that tells you to stop using :latest cannot
 // itself emit a floating tag.
 const (
@@ -189,7 +189,7 @@ func BuildPlan(a *analyzer.Analysis, base Base) Plan {
 	p := Plan{Ecosystem: eco, Builder: stage.BaseImage, User: "nonroot:nonroot"}
 
 	if eco == EcosystemUnknown {
-		p.Reason = "no recognisable build step, so dtrim cannot tell what the runtime stage " +
+		p.Reason = "no recognisable build step, so docker-trim cannot tell what the runtime stage " +
 			"would need to copy. Applying cleanups to the single stage instead."
 		return p
 	}
@@ -214,8 +214,8 @@ func BuildPlan(a *analyzer.Analysis, base Base) Plan {
 func planGo(p *Plan, stage *analyzer.DockerfileAST, base Base) {
 	out := goOutputPath(stage)
 	if out == "" {
-		p.Reason = "the `go build` command has no -o flag, so dtrim cannot tell where the " +
-			"binary lands. Add `-o /path/to/binary` and run dtrim again."
+		p.Reason = "the `go build` command has no -o flag, so docker-trim cannot tell where the " +
+			"binary lands. Add `-o /path/to/binary` and run docker-trim again."
 		return
 	}
 	p.Artifacts = []Artifact{{From: out, To: out}}
@@ -255,7 +255,7 @@ func planGo(p *Plan, stage *analyzer.DockerfileAST, base Base) {
 func planRust(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 	out := entrypointPath(stage)
 	if out == "" {
-		p.Reason = "dtrim could not find the compiled binary: ENTRYPOINT or CMD has to name " +
+		p.Reason = "docker-trim could not find the compiled binary: ENTRYPOINT or CMD has to name " +
 			"it by absolute path for the runtime stage to copy it."
 		return
 	}
@@ -275,7 +275,7 @@ func planRust(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 			p.Supported = false
 			p.Reason = "alpine is musl, but this build produces a glibc binary, which will not " +
 				"run there. Add `--target x86_64-unknown-linux-musl` to the cargo build and run " +
-				"dtrim again, or use --base distroless."
+				"docker-trim again, or use --base distroless."
 			return
 		}
 		p.Runtime = alpineTag
@@ -288,7 +288,7 @@ func planRust(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 
 func planNode(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 	if work == "" {
-		p.Reason = "no WORKDIR, so dtrim cannot tell which directory holds the application."
+		p.Reason = "no WORKDIR, so docker-trim cannot tell which directory holds the application."
 		return
 	}
 	p.Artifacts = []Artifact{{From: work, To: work}}
@@ -308,7 +308,7 @@ func planNode(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 		if major == "" {
 			p.Supported = false
 			p.Reason = "cannot read the Node major version from " + stage.BaseImage +
-				", so dtrim cannot pick a matching alpine runtime."
+				", so docker-trim cannot pick a matching alpine runtime."
 			return
 		}
 		p.Runtime = "node:" + major + "-alpine"
@@ -320,7 +320,7 @@ func planNode(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 		if major == "" {
 			p.Supported = false
 			p.Reason = "cannot read the Node major version from " + stage.BaseImage +
-				", so dtrim cannot pick a matching distroless runtime."
+				", so docker-trim cannot pick a matching distroless runtime."
 			return
 		}
 		p.Runtime = fmt.Sprintf("gcr.io/distroless/nodejs%s-debian12:nonroot", major)
@@ -334,7 +334,7 @@ func planNode(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 
 func planPython(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 	if work == "" {
-		p.Reason = "no WORKDIR, so dtrim cannot tell which directory holds the application."
+		p.Reason = "no WORKDIR, so docker-trim cannot tell which directory holds the application."
 		return
 	}
 	// `pip install --target` writes a flat tree with no version-specific
@@ -406,7 +406,7 @@ func planPython(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) 
 func planJava(p *Plan, stage *analyzer.DockerfileAST, base Base, work string) {
 	jar := jarPath(stage)
 	if jar == "" {
-		p.Reason = "dtrim could not find the built artifact: ENTRYPOINT or CMD has to name " +
+		p.Reason = "docker-trim could not find the built artifact: ENTRYPOINT or CMD has to name " +
 			"the jar by absolute path, as `java -jar /path/app.jar`."
 		return
 	}

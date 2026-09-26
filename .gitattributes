@@ -1,5 +1,5 @@
 # Test data has to be byte-identical on every platform: the golden files record
-# exactly what dtrim emits, and a CRLF checkout would make them fail on Windows
+# exactly what docker-trim emits, and a CRLF checkout would make them fail on Windows
 # for reasons that have nothing to do with the tool.
 * text=auto eol=lf
 *.png binary

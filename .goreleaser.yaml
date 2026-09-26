@@ -1,6 +1,6 @@
 version: 2
 
-project_name: dtrim
+project_name: docker-trim
 
 before:
   hooks:
@@ -15,9 +15,9 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/mkamranr/dtrim/internal/version.version={{.Version}}
-      - -X github.com/mkamranr/dtrim/internal/version.commit={{.ShortCommit}}
-      - -X github.com/mkamranr/dtrim/internal/version.date={{.Date}}
+      - -X github.com/mkamranr/docker-trim/internal/version.version={{.Version}}
+      - -X github.com/mkamranr/docker-trim/internal/version.commit={{.ShortCommit}}
+      - -X github.com/mkamranr/docker-trim/internal/version.date={{.Date}}
 
 archives:
   - name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
@@ -40,7 +40,7 @@ changelog:
 release:
   github:
     owner: mkamranr
-    name: dtrim
+    name: docker-trim
   draft: false
   # Re-running a release has to work. Without this, goreleaser refuses to
   # overwrite assets it already uploaded and the whole run fails with
@@ -49,9 +49,9 @@ release:
   mode: replace
 
 brews:
-  - name: dtrim
+  - name: docker-trim
     # Homebrew stopped discovering formulae at a tap's root, so without this
-    # goreleaser writes a dtrim.rb that `brew install` cannot see, and the
+    # goreleaser writes a docker-trim.rb that `brew install` cannot see, and the
     # release looks like it worked.
     directory: Formula
     repository:
@@ -59,27 +59,27 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.TAP_TOKEN }}"
     commit_author:
-      name: dtrim release bot
+      name: docker-trim release bot
       email: noreply@github.com
-    commit_msg_template: "dtrim {{ .Version }}"
-    homepage: https://github.com/mkamranr/dtrim
+    commit_msg_template: "docker-trim {{ .Version }}"
+    homepage: https://github.com/mkamranr/docker-trim
     description: Shrink container images and cut their attack surface
     license: "MIT OR Apache-2.0"
     test: |
-      system "#{bin}/dtrim", "--version"
+      system "#{bin}/docker-trim", "--version"
 
 dockers:
   - image_templates:
-      - "ghcr.io/mkamranr/dtrim:{{ .Tag }}-amd64"
-      - "ghcr.io/mkamranr/dtrim:latest-amd64"
+      - "ghcr.io/mkamranr/docker-trim:{{ .Tag }}-amd64"
+      - "ghcr.io/mkamranr/docker-trim:latest-amd64"
     use: buildx
     goarch: amd64
     dockerfile: Dockerfile.goreleaser
     build_flag_templates:
       - "--platform=linux/amd64"
   - image_templates:
-      - "ghcr.io/mkamranr/dtrim:{{ .Tag }}-arm64"
-      - "ghcr.io/mkamranr/dtrim:latest-arm64"
+      - "ghcr.io/mkamranr/docker-trim:{{ .Tag }}-arm64"
+      - "ghcr.io/mkamranr/docker-trim:latest-arm64"
     use: buildx
     goarch: arm64
     dockerfile: Dockerfile.goreleaser
@@ -87,11 +87,11 @@ dockers:
       - "--platform=linux/arm64"
 
 docker_manifests:
-  - name_template: "ghcr.io/mkamranr/dtrim:{{ .Tag }}"
+  - name_template: "ghcr.io/mkamranr/docker-trim:{{ .Tag }}"
     image_templates:
-      - "ghcr.io/mkamranr/dtrim:{{ .Tag }}-amd64"
-      - "ghcr.io/mkamranr/dtrim:{{ .Tag }}-arm64"
-  - name_template: "ghcr.io/mkamranr/dtrim:latest"
+      - "ghcr.io/mkamranr/docker-trim:{{ .Tag }}-amd64"
+      - "ghcr.io/mkamranr/docker-trim:{{ .Tag }}-arm64"
+  - name_template: "ghcr.io/mkamranr/docker-trim:latest"
     image_templates:
-      - "ghcr.io/mkamranr/dtrim:latest-amd64"
-      - "ghcr.io/mkamranr/dtrim:latest-arm64"
+      - "ghcr.io/mkamranr/docker-trim:latest-amd64"
+      - "ghcr.io/mkamranr/docker-trim:latest-arm64"

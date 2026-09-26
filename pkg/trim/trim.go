@@ -1,4 +1,4 @@
-// Package dtrim is the library behind the `dtrim` command.
+// Package trim is the library behind the docker-trim command.
 //
 // It presents the interface the PRD declares (section 5) and drives the
 // pipeline: parse, inspect, rewrite, score, report. The data structures
@@ -8,11 +8,11 @@
 // facade over the mechanism that actually does the work.
 //
 // See docs/library.md for worked examples.
-package dtrim
+package trim
 
 import (
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/synthesizer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/synthesizer"
 )
 
 // DockerfileAST is one parsed build stage. See analyzer.DockerfileAST.
@@ -27,13 +27,13 @@ type TraceManifest = analyzer.TraceManifest
 // OptimizationResult is the headline reduction report. See analyzer.OptimizationResult.
 type OptimizationResult = analyzer.OptimizationResult
 
-// Finding is one thing dtrim noticed. See analyzer.Finding.
+// Finding is one thing docker-trim noticed. See analyzer.Finding.
 type Finding = analyzer.Finding
 
 // Severity ranks a finding. See analyzer.Severity.
 type Severity = analyzer.Severity
 
-// Confidence says how sure dtrim is that a fix is safe. See analyzer.Confidence.
+// Confidence says how sure docker-trim is that a fix is safe. See analyzer.Confidence.
 type Confidence = analyzer.Confidence
 
 // Base is the --base value: which minimal runtime the final stage lands on. It

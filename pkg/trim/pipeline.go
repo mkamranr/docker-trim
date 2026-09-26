@@ -1,4 +1,4 @@
-package dtrim
+package trim
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/security"
-	"github.com/mkamranr/dtrim/pkg/synthesizer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/security"
+	"github.com/mkamranr/docker-trim/pkg/synthesizer"
 )
 
 // SchemaVersion is the version of the JSON report. It changes only when an
@@ -67,7 +67,7 @@ type TraceReport struct {
 // Breaches returns the findings at or above the given severity that a run
 // still has to answer for.
 //
-// Only unfixed findings count. Something dtrim repaired is no longer in the
+// Only unfixed findings count. Something docker-trim repaired is no longer in the
 // Dockerfile you are about to build, so failing a pipeline over it would be
 // reporting on a file that no longer exists.
 func (r *Report) Breaches(threshold Severity) []Finding {
@@ -83,13 +83,13 @@ func (r *Report) Breaches(threshold Severity) []Finding {
 	return out
 }
 
-// DockerfileReport describes the file that was analyzed and what dtrim did
+// DockerfileReport describes the file that was analyzed and what docker-trim did
 // with it.
 type DockerfileReport struct {
 	Path string `json:"path"`
 	// Output is where the trimmed file was written, empty if nothing was.
 	Output string `json:"output,omitempty"`
-	// Ecosystem is the toolchain dtrim recognised.
+	// Ecosystem is the toolchain docker-trim recognised.
 	Ecosystem string `json:"ecosystem"`
 	// Stages is the stage count of the input.
 	Stages int `json:"stages"`
@@ -125,7 +125,7 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 		return nil, err
 	}
 
-	rep := &Report{SchemaVersion: SchemaVersion, Tool: "dtrim"}
+	rep := &Report{SchemaVersion: SchemaVersion, Tool: "docker-trim"}
 
 	if cfg.Image != "" {
 		// Ownership costs extra reading and is only useful next to a trace.

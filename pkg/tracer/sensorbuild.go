@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
 )
 
 // sensorFiles is compiled inside the ephemeral image rather than shipped as a
@@ -24,13 +24,13 @@ import (
 //go:embed sensor/*.go
 var sensorFiles embed.FS
 
-// sensorBuilderImage compiles the sensor. Pinned, because dtrim tells everyone
+// sensorBuilderImage compiles the sensor. Pinned, because docker-trim tells everyone
 // else not to float their base image tags.
 const sensorBuilderImage = "golang:1.25-alpine"
 
 const (
-	beginMarker = "<<<DTRIM-TRACE-BEGIN>>>"
-	endMarker   = "<<<DTRIM-TRACE-END>>>"
+	beginMarker = "<<<DOCKER-TRIM-TRACE-BEGIN>>>"
+	endMarker   = "<<<DOCKER-TRIM-TRACE-END>>>"
 )
 
 // buildInstrumented produces an ephemeral image: the target, plus the sensor,
@@ -40,7 +40,7 @@ const (
 // time, because the image's own command has to stay in CMD for `docker run` to
 // keep behaving the way the image documents.
 func buildInstrumented(ctx context.Context, image string, opts Options, mode Backend) (string, error) {
-	dir, err := os.MkdirTemp("", "dtrim-trace")
+	dir, err := os.MkdirTemp("", "docker-trim-trace")
 	if err != nil {
 		return "", err
 	}
@@ -65,7 +65,7 @@ func buildInstrumented(ctx context.Context, image string, opts Options, mode Bac
 		return "", err
 	}
 	entrypoint, err := json.Marshal([]string{
-		"/.dtrim/sensor",
+		"/.docker-trim/sensor",
 		"--mode", string(mode),
 		"--interval", opts.Interval.String(),
 		"--settle", opts.Settle.String(),
@@ -75,13 +75,13 @@ func buildInstrumented(ctx context.Context, image string, opts Options, mode Bac
 		return "", err
 	}
 
-	dockerfile := fmt.Sprintf(`FROM %s AS dtrim-sensor
+	dockerfile := fmt.Sprintf(`FROM %s AS docker-trim-sensor
 WORKDIR /s
 COPY *.go ./
-RUN go mod init dtrimsensor >/dev/null && CGO_ENABLED=0 go build -ldflags="-s -w" -o /dtrim-sensor .
+RUN go mod init dockertrimsensor >/dev/null && CGO_ENABLED=0 go build -ldflags="-s -w" -o /docker-trim-sensor .
 
 FROM %s
-COPY --from=dtrim-sensor /dtrim-sensor /.dtrim/sensor
+COPY --from=docker-trim-sensor /docker-trim-sensor /.docker-trim/sensor
 ENTRYPOINT %s
 CMD %s
 `, sensorBuilderImage, image, entrypoint, encoded)
@@ -90,7 +90,7 @@ CMD %s
 		return "", err
 	}
 
-	tag := "dtrim-trace:" + ShortHash(image+string(encoded)+string(entrypoint))
+	tag := "docker-trim-trace:" + ShortHash(image+string(encoded)+string(entrypoint))
 	cmd := exec.CommandContext(ctx, "docker", "build", "-t", tag, dir)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -106,7 +106,7 @@ CMD %s
 // dockerFlags are the extra privileges a backend needs; the proc sampler needs
 // none, which is the whole reason it is the default.
 func runTraced(ctx context.Context, tag string, opts Options, backend Backend, dockerFlags []string) (*Result, error) {
-	name := "dtrim-trace-" + ShortHash(tag)
+	name := "docker-trim-trace-" + ShortHash(tag)
 	_ = exec.CommandContext(ctx, "docker", "rm", "-f", name).Run()
 	defer func() {
 		_ = exec.CommandContext(context.WithoutCancel(ctx), "docker", "rm", "-f", name).Run()

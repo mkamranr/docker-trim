@@ -1,4 +1,4 @@
-"""A minimal Flask service, used to measure what dtrim actually saves."""
+"""A minimal Flask service, used to measure what docker-trim actually saves."""
 
 from flask import Flask
 

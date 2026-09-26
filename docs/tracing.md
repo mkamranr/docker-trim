@@ -8,9 +8,9 @@ The `proc` and `ptrace` backends ship. `ebpf` is accepted and rejected with a po
 the backends that work.
 
 ```console
-$ dtrim --image myapp:latest --tracer proc --trace "pytest -q"
-[dtrim] building an instrumented copy of myapp:latest
-[dtrim] running /bin/sh -c pytest -q under the sampler for up to 30s
+$ docker-trim --image myapp:latest --tracer proc --trace "pytest -q"
+[docker-trim] building an instrumented copy of myapp:latest
+[docker-trim] running /bin/sh -c pytest -q under the sampler for up to 30s
 
 Runtime trace
   Observed            : 45 files, 2 binaries, 39 shared libraries across 2 processes, 42 samples
@@ -41,26 +41,26 @@ The `proc` sampler needs no capabilities, no kernel features and no seccomp chan
 on Docker Desktop, on a hardened CI runner, and on a locked-down Kubernetes node. And what it
 produces — the set of executed binaries and loaded shared libraries — is exactly what the
 package-pruning step consumes, because that is what maps back to packages through the dpkg
-and apk databases dtrim already reads.
+and apk databases docker-trim already reads.
 
 `ptrace` and `ebpf` are better where they run. They are backends, not the foundation.
 
 ## How the sensor gets in
 
-dtrim builds an ephemeral copy of the target image with the sensor wrapping its entrypoint:
+docker-trim builds an ephemeral copy of the target image with the sensor wrapping its entrypoint:
 
 ```dockerfile
-FROM golang:1.25-alpine AS dtrim-sensor
+FROM golang:1.25-alpine AS docker-trim-sensor
 COPY sensor.go .
-RUN go mod init dtrimsensor && CGO_ENABLED=0 go build -o /dtrim-sensor .
+RUN go mod init dockertrimsensor && CGO_ENABLED=0 go build -o /docker-trim-sensor .
 
 FROM <target>
-COPY --from=dtrim-sensor /dtrim-sensor /.dtrim/sensor
-ENTRYPOINT ["/.dtrim/sensor","--"]
+COPY --from=docker-trim-sensor /docker-trim-sensor /.docker-trim/sensor
+ENTRYPOINT ["/.docker-trim/sensor","--"]
 CMD [<the original entrypoint and command, or your --trace command>]
 ```
 
-The sensor's **source** is embedded in dtrim and compiled inside that build, rather than
+The sensor's **source** is embedded in docker-trim and compiled inside that build, rather than
 shipped as a binary. It is therefore always the right architecture, needs no
 cross-compilation matrix, and no executable has to live in the repository.
 
@@ -70,7 +70,7 @@ that is already running misses it.
 
 The manifest comes back through **stderr between markers**, not through a file or a bind
 mount: the image may run as a user who cannot write anywhere, and a mount would need a
-writable host path. dtrim reads the container's logs and takes what is between the markers.
+writable host path. docker-trim reads the container's logs and takes what is between the markers.
 
 ## Choosing between them
 
@@ -95,14 +95,14 @@ takes about **twice as long** under `ptrace` (3.7s against 1.8s). Every traced s
 extra context switches, so the overhead scales with syscall count rather than wall time.
 
 `ptrace` also needs privileges the sampler does not: `--cap-add=SYS_PTRACE` and
-`--security-opt seccomp=unconfined`, both applied only to the throwaway container dtrim
+`--security-opt seccomp=unconfined`, both applied only to the throwaway container docker-trim
 builds for the trace. Some environments will not grant them, which is why the default
 backend asks for nothing.
 
 ## How ptrace avoids the race
 
 Every syscall produces two stops: one going in, with the arguments, and one coming out, with
-the result. dtrim reads the path on the way in, holds it, and records it only if the call
+the result. docker-trim reads the path on the way in, holds it, and records it only if the call
 returned successfully. A file the program looked for and did not find is therefore never
 counted as used, which no amount of sampling can tell you.
 
@@ -110,7 +110,7 @@ Telling the two stops apart is the part that looks easy and is not. A tracer tha
 alternates entry, exit, entry, exit is correct until a process forks: the child's first stop
 is not the entry its bookkeeping expects, and from that point every entry is read as an exit.
 The symptom is that a shell script traces fine but everything it spawns silently vanishes —
-which is exactly the workload people pass to `--trace`. dtrim asks the kernel instead, with
+which is exactly the workload people pass to `--trace`. docker-trim asks the kernel instead, with
 `PTRACE_GET_SYSCALL_INFO` (Linux 5.3 and later), which reports the stop, the syscall number
 and its arguments directly. That also means no per-architecture register decoding: the same
 code is correct on x86-64 and arm64.
@@ -139,7 +139,7 @@ What is reliable is anything mapped for the life of the process, which is the in
 every library it links against, and every long-lived worker. That is also what accounts for
 most of an image.
 
-So dtrim reports **how long the traced command ran** and warns when it was under a second,
+So docker-trim reports **how long the traced command ran** and warns when it was under a second,
 because a user who cannot tell a thorough trace from two frames of a forty-millisecond
 process will read "139 packages unused" as a fact. Give it a real workload with `--trace`,
 and treat the output as evidence rather than proof. `ptrace` exists on the roadmap precisely
@@ -150,10 +150,10 @@ because it has no such race.
 1. The sensor produces a `TraceManifest`: accessed files, executed binaries, loaded shared
    libraries.
 2. Each path is mapped to its owning package through `/var/lib/dpkg/info/*.list` or
-   `/lib/apk/db/installed`, both of which dtrim already parses during layer inspection.
+   `/lib/apk/db/installed`, both of which docker-trim already parses during layer inspection.
 3. `removable = installed − used − essential`, where the essential set is never touched:
    libc, the dynamic loader, `ca-certificates`, `tzdata`, `base-files`.
-4. The result is reported. **Removal stays manual**: dtrim tells you what to consider
+4. The result is reported. **Removal stays manual**: docker-trim tells you what to consider
    dropping and leaves the decision to the person who knows the workload. A trace only
    covers the code paths you exercised, and the package that goes unused all week is the one
    your error handler needs.
@@ -164,5 +164,5 @@ zone data only when something formats a local time. A short trace touches none o
 would happily suggest deleting all three, so they are excluded by name.
 
 Note that Debian priorities are not a safe proxy here: `libc6` is priority `optional`, while
-`vim-tiny` is `important`. dtrim treats only `Essential: yes` and priority `required` as
+`vim-tiny` is `important`. docker-trim treats only `Essential: yes` and priority `required` as
 structural, and protects the rest by name.

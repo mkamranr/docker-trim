@@ -5,7 +5,7 @@
 # warning: CGO_ENABLED=0 was set in the builder so the binary is static and depends on no libc. If the project genuinely needs cgo, build on an image matching the runtime's libc and remove that line.
 # ---
 FROM golang:1.24 AS builder
-# dtrim(DT103): added by dtrim so the runtime stage can be minimal
+# docker-trim(DT103): added by docker-trim so the runtime stage can be minimal
 ENV CGO_ENABLED=0
 
 WORKDIR /src
@@ -18,12 +18,12 @@ COPY . .
 
 RUN go build -o /src/bin/api ./cmd/api
 
-# dtrim(DT100): runtime stage carries the application and nothing else
+# docker-trim(DT100): runtime stage carries the application and nothing else
 FROM alpine:3.21
 WORKDIR /src
-# dtrim(DT101): only the build output crosses the stage boundary
+# docker-trim(DT101): only the build output crosses the stage boundary
 COPY --from=builder --chown=10001:10001 /src/bin/api /src/bin/api
 EXPOSE 8080
-# dtrim(DT010): drop privileges before the process starts
+# docker-trim(DT010): drop privileges before the process starts
 USER 10001:10001
 CMD ["/src/bin/api"]

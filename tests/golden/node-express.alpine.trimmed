@@ -20,16 +20,16 @@ RUN npm install \
 RUN npm run build
 
 ENV NODE_ENV=production
-# dtrim(DT103): added by dtrim so the runtime stage can be minimal
+# docker-trim(DT103): added by docker-trim so the runtime stage can be minimal
 RUN npm prune --omit=dev
 
-# dtrim(DT100): runtime stage carries the application and nothing else
+# docker-trim(DT100): runtime stage carries the application and nothing else
 FROM node:18-alpine
 WORKDIR /app
-# dtrim(DT101): only the build output crosses the stage boundary
+# docker-trim(DT101): only the build output crosses the stage boundary
 COPY --from=builder --chown=node:node /app /app
 ENV NODE_ENV=production
 EXPOSE 3000
-# dtrim(DT010): drop privileges before the process starts
+# docker-trim(DT010): drop privileges before the process starts
 USER node
 CMD ["node","dist/server.js"]

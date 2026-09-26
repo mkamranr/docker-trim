@@ -2,12 +2,12 @@
 # binary and passes a context containing just that. The repository's Dockerfile
 # is the one to build from source.
 #
-# distroless/static suits dtrim exactly: the binary is static, and the image it
-# lands in has no shell and no package manager, which is the arrangement dtrim
+# distroless/static suits docker-trim exactly: the binary is static, and the image it
+# lands in has no shell and no package manager, which is the arrangement docker-trim
 # spends its time recommending.
 FROM gcr.io/distroless/static-debian12:nonroot
 
-COPY dtrim /usr/local/bin/dtrim
+COPY docker-trim /usr/local/bin/docker-trim
 
 WORKDIR /work
-ENTRYPOINT ["dtrim"]
+ENTRYPOINT ["docker-trim"]

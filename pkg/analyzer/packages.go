@@ -163,7 +163,7 @@ func (d *packageDB) parse() (manager string, pkgs []Package, notes []string) {
 	case d.sawRPM:
 		manager = "rpm"
 		notes = append(notes,
-			"This image uses rpm, whose database dtrim cannot read yet, so no operating-system "+
+			"This image uses rpm, whose database docker-trim cannot read yet, so no operating-system "+
 				"package inventory is available. Size, layer and language analysis are unaffected.")
 	default:
 		manager = "none"
@@ -227,7 +227,7 @@ func parseDpkgStatus(b []byte) []Package {
 // in "installed" is what separates them. A status.d file carries no Status
 // field at all — libc6 in a distroless image has Package, Source, Version and
 // little else — so requiring one drops every package in exactly the images
-// dtrim recommends people move to.
+// docker-trim recommends people move to.
 func parseDpkgStanzas(b []byte, assumeInstalled bool) []Package {
 	var (
 		out  []Package

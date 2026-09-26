@@ -1,11 +1,11 @@
-package dtrim
+package trim
 
 import (
 	"fmt"
 	"io"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/tracer"
+	"github.com/mkamranr/docker-trim/pkg/tracer"
 )
 
 // TracerBackend selects how runtime tracing observes the container. See
@@ -37,7 +37,7 @@ type Config struct {
 	Base Base
 	// Output is where the optimized Dockerfile is written (--output).
 	Output string
-	// Optimize turns on rewriting. Without it dtrim reports and writes nothing.
+	// Optimize turns on rewriting. Without it docker-trim reports and writes nothing.
 	Optimize bool
 	// AnalyzeOnly forces a read-only run even if Optimize is set.
 	AnalyzeOnly bool
@@ -63,7 +63,7 @@ type Config struct {
 	// PruneUnused drops packages a trace never saw used from the install
 	// commands that name them.
 	PruneUnused bool
-	// FailOn makes dtrim exit non-zero when a finding of this severity or
+	// FailOn makes docker-trim exit non-zero when a finding of this severity or
 	// worse survives. Empty means never fail on findings, which is the
 	// default: a report is not an error unless you asked for it to be.
 	FailOn Severity

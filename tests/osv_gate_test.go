@@ -15,7 +15,7 @@ import (
 )
 
 // advisoryPrefixes are the identifier shapes OSV returns for the ecosystems
-// dtrim scans.
+// docker-trim scans.
 var advisoryPrefixes = []string{"CVE-", "DEBIAN-", "ALPINE-", "UBUNTU-", "GHSA-", "PYSEC-", "OSV-"}
 
 func isAdvisory(ruleID string) bool {
@@ -53,7 +53,7 @@ type osvReport struct {
 func TestOSV_advisories_survive_a_dockerfile_analysis(t *testing.T) {
 	requireDocker(t)
 
-	// A Dockerfile dtrim has nothing high to say about, so only an advisory
+	// A Dockerfile docker-trim has nothing high to say about, so only an advisory
 	// can trip the gate.
 	dir := t.TempDir()
 	clean := filepath.Join(dir, "Dockerfile")
@@ -61,7 +61,7 @@ func TestOSV_advisories_survive_a_dockerfile_analysis(t *testing.T) {
 		"FROM gcr.io/distroless/static-debian12:nonroot\nCOPY app /app\nCMD [\"/app\"]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if r := dtrim(t, "--analyze-only", "-f", clean, "--fail-on", "high"); r.code != 0 {
+	if r := dockerTrim(t, "--analyze-only", "-f", clean, "--fail-on", "high"); r.code != 0 {
 		t.Fatalf("the fixture Dockerfile is not clean at high severity (exit %d):\n%s", r.code, r.stdout)
 	}
 
@@ -70,7 +70,7 @@ func TestOSV_advisories_survive_a_dockerfile_analysis(t *testing.T) {
 		t.Skipf("cannot pull %s: %v\n%s", image, err, out)
 	}
 
-	r := dtrim(t, "--analyze-only", "--image", image, "-f", clean, "--osv", "--quiet")
+	r := dockerTrim(t, "--analyze-only", "--image", image, "-f", clean, "--osv", "--quiet")
 	if r.code != 0 {
 		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
 	}
@@ -100,11 +100,11 @@ func TestOSV_advisories_survive_a_dockerfile_analysis(t *testing.T) {
 			"see them; severities: %v", rep.Vulnerabilities.Total, rep.Vulnerabilities.BySeverity)
 	}
 	if worst == "" {
-		t.Skip("no advisory carried a severity dtrim could band, so the gate has nothing to act on")
+		t.Skip("no advisory carried a severity docker-trim could band, so the gate has nothing to act on")
 	}
 
 	// And the gate must actually act on them.
-	gated := dtrim(t, "--analyze-only", "--image", image, "-f", clean, "--osv", "--fail-on", worst)
+	gated := dockerTrim(t, "--analyze-only", "--image", image, "-f", clean, "--osv", "--fail-on", worst)
 	if gated.code != 1 {
 		t.Errorf("exit %d with %d advisories at %s or above, want 1\n%s",
 			gated.code, len(advisories), worst, gated.stdout)
@@ -125,7 +125,7 @@ func TestOSV_keeps_dockerfile_findings_too(t *testing.T) {
 		t.Skipf("cannot pull %s: %v\n%s", image, err, out)
 	}
 
-	r := dtrim(t, "--analyze-only", "--image", image,
+	r := dockerTrim(t, "--analyze-only", "--image", image,
 		"-f", fixture("node-express.Dockerfile"), "--osv", "--quiet")
 	if r.code != 0 {
 		t.Fatalf("exit %d\n%s", r.code, r.stderr)
@@ -155,7 +155,7 @@ func TestOSV_keeps_dockerfile_findings_too(t *testing.T) {
 //
 // This is the claim most likely to be quoted, so it is also the one most worth
 // proving. The test builds a fat image, compares it against the minimal base
-// dtrim would move it to, and requires the reduction to be real and measured.
+// docker-trim would move it to, and requires the reduction to be real and measured.
 func TestOSV_compare_measures_what_a_rewrite_removes(t *testing.T) {
 	requireDocker(t)
 
@@ -167,7 +167,7 @@ func TestOSV_compare_measures_what_a_rewrite_removes(t *testing.T) {
 		}
 	}
 
-	r := dtrim(t, "--image", fat, "--osv", "--compare", lean, "--quiet")
+	r := dockerTrim(t, "--image", fat, "--osv", "--compare", lean, "--quiet")
 	if r.code != 0 {
 		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
 	}
@@ -186,7 +186,7 @@ func TestOSV_compare_measures_what_a_rewrite_removes(t *testing.T) {
 	}
 
 	// The distroless base records its packages one stanza per file under
-	// status.d. Before dtrim read that format it reported zero packages, which
+	// status.d. Before docker-trim read that format it reported zero packages, which
 	// would have made this comparison a lie rather than a measurement.
 	if !rep.Optimization.RemainingCVEsKnown {
 		t.Fatal("the minimal image's inventory was unreadable, so no comparison was possible")
@@ -220,13 +220,13 @@ func TestOSV_compare_refuses_to_claim_a_reduction_against_scratch(t *testing.T) 
 		[]byte("FROM scratch\nCOPY hello /hello\nCMD [\"/hello\"]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	const tag = "dtrim-compare-it:scratch"
+	const tag = "docker-trim-compare-it:scratch"
 	if out, err := exec.Command("docker", "build", "-q", "-t", tag, dir).CombinedOutput(); err != nil {
 		t.Fatalf("building the scratch fixture: %v\n%s", err, out)
 	}
 	t.Cleanup(func() { _ = exec.Command("docker", "image", "rm", "-f", tag).Run() })
 
-	r := dtrim(t, "--image", fat, "--osv", "--compare", tag, "--quiet")
+	r := dockerTrim(t, "--image", fat, "--osv", "--compare", tag, "--quiet")
 	if r.code != 0 {
 		t.Fatalf("comparing against an unreadable image should not fail: exit %d\n%s", r.code, r.stderr)
 	}

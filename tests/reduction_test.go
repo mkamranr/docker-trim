@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/synthesizer"
-	"github.com/mkamranr/dtrim/pkg/tracer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/synthesizer"
+	"github.com/mkamranr/docker-trim/pkg/tracer"
 )
 
-// bands are the minimum size reductions dtrim must achieve on each sample
+// bands are the minimum size reductions docker-trim must achieve on each sample
 // project. They are floors, not targets: the README quotes these numbers, and
 // this test is what stops the README from drifting into fiction.
 //
@@ -31,8 +31,8 @@ var bands = map[string]float64{
 }
 
 func TestReductionBands(t *testing.T) {
-	if os.Getenv("DTRIM_INTEGRATION") == "" {
-		t.Skip("set DTRIM_INTEGRATION=1 to run tests that build real images")
+	if os.Getenv("DOCKER_TRIM_INTEGRATION") == "" {
+		t.Skip("set DOCKER_TRIM_INTEGRATION=1 to run tests that build real images")
 	}
 	ctx := context.Background()
 	if err := tracer.Available(ctx); err != nil {
@@ -61,8 +61,8 @@ func TestReductionBands(t *testing.T) {
 			}
 			defer func() { _ = os.Remove(trimmedPath) }()
 
-			origTag := fmt.Sprintf("dtrim-band-%s:orig", name)
-			trimTag := fmt.Sprintf("dtrim-band-%s:trim", name)
+			origTag := fmt.Sprintf("docker-trim-band-%s:orig", name)
+			trimTag := fmt.Sprintf("docker-trim-band-%s:trim", name)
 			defer tracer.Remove(ctx, origTag, trimTag)
 
 			originalSize, err := tracer.Build(ctx, tracer.BuildRequest{
@@ -73,7 +73,7 @@ func TestReductionBands(t *testing.T) {
 			trimmedSize, err := tracer.Build(ctx, tracer.BuildRequest{
 				Dockerfile: trimmedPath, Context: dir, Tag: trimTag})
 			if err != nil {
-				t.Fatalf("the trimmed Dockerfile does not build, which is a dtrim bug: %v", err)
+				t.Fatalf("the trimmed Dockerfile does not build, which is a docker-trim bug: %v", err)
 			}
 
 			// Trimming must never make an image bigger.

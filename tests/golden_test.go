@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mkamranr/dtrim/pkg/analyzer"
-	"github.com/mkamranr/dtrim/pkg/synthesizer"
+	"github.com/mkamranr/docker-trim/pkg/analyzer"
+	"github.com/mkamranr/docker-trim/pkg/synthesizer"
 )
 
 // update rewrites the golden files instead of comparing against them.
 //
-// Regenerating is not the same as reviewing. A golden diff is dtrim telling
+// Regenerating is not the same as reviewing. A golden diff is docker-trim telling
 // you the Dockerfile it emits has changed; read every line of it before
 // running with -update, because these files are the record of what the tool
 // actually produces.
@@ -65,7 +65,7 @@ func TestGolden(t *testing.T) {
 }
 
 // header records the decision alongside the file, so a golden diff shows both
-// what changed and why dtrim chose it.
+// what changed and why docker-trim chose it.
 func header(res *synthesizer.Result) string {
 	var b strings.Builder
 	b.WriteString("# ecosystem: " + string(res.Plan.Ecosystem) + "\n")

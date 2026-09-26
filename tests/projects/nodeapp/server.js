@@ -1,4 +1,4 @@
-// A minimal Express service, used to measure what dtrim actually saves.
+// A minimal Express service, used to measure what docker-trim actually saves.
 const express = require("express");
 
 const app = express();

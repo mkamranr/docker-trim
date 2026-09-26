@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Renamed from `dtrim` to `docker-trim`.** The old name said nothing about what the tool
+  does; the new one says it in the name. This moves the command, the repository, the Go module
+  path, the container image, the Homebrew formula, the release archives and the
+  `DOCKER_TRIM_VERSION` / `DOCKER_TRIM_BIN_DIR` environment variables.
+
+  GitHub redirects the old repository URL, and `go install` follows that redirect, so nothing
+  breaks outright. Anyone with the old binary should reinstall; `brew install
+  mkamranr/tap/docker-trim` replaces `brew install mkamranr/tap/dtrim`.
+
+  The Go library package is `pkg/trim`, imported as `github.com/mkamranr/docker-trim/pkg/trim`,
+  because a Go package name cannot contain a hyphen and `trim.Run` reads better than the
+  alternatives.
+
+### Added
+
+- **It works as a Docker CLI plugin.** The name is exactly the convention Docker uses, so it
+  now behaves accordingly: linked into `~/.docker/cli-plugins` it answers to `docker trim`
+  with identical flags. Without this, a binary called `docker-trim` placed where its name
+  suggests would have been reported by Docker as an invalid plugin.
+
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
@@ -20,7 +42,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **dtrim reports what a rewrite removed, not just what the original had.** `remainingCVEs`
+- **docker-trim reports what a rewrite removed, not just what the original had.** `remainingCVEs`
   has been `0` since 0.1.0. `--osv --verify` now scans the image it just built, and
   `--compare <tag>` measures any two existing tags. Measured on a real Python service:
 
@@ -36,12 +58,12 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - **Distroless images reported zero packages.** They record what they contain as one stanza
-  file per package under `/var/lib/dpkg/status.d/`, and dtrim read only the single
+  file per package under `/var/lib/dpkg/status.d/`, and docker-trim read only the single
   `/var/lib/dpkg/status` database. `gcr.io/distroless/base-debian12` reported
   `packageManager: none` and no packages; it ships seven, including `libc6` and `libssl3` —
   the two that carry the advisories.
 
-  So the images dtrim spends its time recommending were the ones it could not inspect, and any
+  So the images docker-trim spends its time recommending were the ones it could not inspect, and any
   before-and-after against one would have read `72 -> 0` while measuring nothing. Those stanzas
   carry no `Status:` field, unlike the status database, so they are treated as installed by
   the presence of the file.
@@ -53,9 +75,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Known limitations
 
-- **The comparison is only as good as both inventories.** An ecosystem dtrim cannot read on
+- **The comparison is only as good as both inventories.** An ecosystem docker-trim cannot read on
   either side is silently absent from both counts, so a reduction can flatter a rewrite that
-  merely moved dependencies somewhere dtrim does not look.
+  merely moved dependencies somewhere docker-trim does not look.
 - **rpm images still report no packages**, so neither side of a comparison works for them.
 - **A reduction is not a guarantee.** It counts advisories, not exploitability: ten
   unreachable ones removed and one reachable one kept still reads as an improvement.
@@ -120,7 +142,7 @@ All notable changes to this project are documented here. The format follows
   Everything else is additive.
 
 - **Language packages are never classified as removable.** They are inventoried and scanned,
-  but never appear in the "never touched" list and never reach `--prune-unused`: dtrim edits
+  but never appear in the "never touched" list and never reach `--prune-unused`: docker-trim edits
   Dockerfiles and those arrive through a lockfile. It also closes a hazard, since a PyPI
   package sharing a name with an OS one could otherwise have got that OS package stripped
   from an `apt-get install` line.
@@ -128,7 +150,7 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - **The Homebrew formula is written to `Formula/`.** goreleaser put it at the tap's root,
-  where modern Homebrew no longer looks, so `brew install mkamranr/tap/dtrim` reported no
+  where modern Homebrew no longer looks, so `brew install mkamranr/tap/docker-trim` reported no
   such formula even though the release had published one. The 0.5.1 formula was moved into
   place by hand; releases from here on write there directly.
 
@@ -160,7 +182,7 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - **`--osv`**, which looks every installed package up at osv.dev and reports what is known to
-  affect it. The report was printing `n/a` for CVEs since 0.1.0 because dtrim had no
+  affect it. The report was printing `n/a` for CVEs since 0.1.0 because docker-trim had no
   vulnerability data and would not guess; now it has some.
 
   Advisories become findings, so `--fail-on` gates on them without a second threshold: a
@@ -170,19 +192,19 @@ All notable changes to this project are documented here. The format follows
 
   Severity is computed from the advisory's CVSS v3 vector using the formula in the
   specification, including its own rounding rule, and checked against scores published by
-  NVD. An advisory with no vector dtrim can read is counted and listed as `unknown` and
+  NVD. An advisory with no vector docker-trim can read is counted and listed as `unknown` and
   cannot trip `--fail-on`: banding it would be a guess, and a guess either fires a gate for
   nothing or stays quiet when it should not.
 
-  This is the only part of dtrim that sends anything anywhere, which is why it is opt-in. The
+  This is the only part of docker-trim that sends anything anywhere, which is why it is opt-in. The
   query carries the name and version of every package in the image.
 
 - **A corpus survey** (`scripts/fetch-corpus.sh` and `tests/corpus_test.go`). The rest of the
-  suite runs against fixtures this project wrote, which only contains shapes dtrim was
+  suite runs against fixtures this project wrote, which only contains shapes docker-trim was
   designed for. This runs the same guarantees against Dockerfiles written by other people.
 
   Across 66 real files at all three bases, 195 rewrites in total: no panics, no unparseable
-  output, and no file altered when dtrim had nothing to change. The two properties the README
+  output, and no file altered when docker-trim had nothing to change. The two properties the README
   claims survive contact with strangers' Dockerfiles.
 
   It also measured what the rewrite actually applies to, which was less than the README
@@ -208,22 +230,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **The tracer now informs the rewrite.** They were two halves that did not talk: dtrim could
+- **The tracer now informs the rewrite.** They were two halves that did not talk: docker-trim could
   see which packages went untouched and could write a minimal Dockerfile, but could not write
   one that used what it saw.
 
-  A trace knows which binaries a program actually executes, so dtrim now checks the rewrite
+  A trace knows which binaries a program actually executes, so docker-trim now checks the rewrite
   against it and reports a **runtime gap** when the chosen base will not contain something the
-  program ran. This is the failure dtrim is most capable of causing: a Go service that shells
+  program ran. This is the failure docker-trim is most capable of causing: a Go service that shells
   out, rewritten onto distroless, goes from 909 MB to 4.8 MB and then prints
   `fork/exec /bin/sh: no such file or directory`. It builds cleanly, so nothing catches it
   until production. An integration test builds that broken image deliberately and confirms
-  dtrim predicted it.
+  docker-trim predicted it.
 
 - **`--prune-unused`** drops packages a trace never saw used from the install commands that
   name them. It removes them from the install rather than purging them afterwards, because a
   purge in a later layer makes the image bigger while looking like a cleanup, which is what
-  dtrim reports as DT002 in other people's files. It only touches a stage that ships: a
+  docker-trim reports as DT002 in other people's files. It only touches a stage that ships: a
   runtime trace says nothing about what building the image required, so pruning a builder on
   that evidence would break the build, and a single-stage file's install serves both.
 
@@ -235,7 +257,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Known limitations
 
-- **Runtime gaps are only as good as the workload.** dtrim can only warn about a binary it
+- **Runtime gaps are only as good as the workload.** docker-trim can only warn about a binary it
   saw run. A code path the trace never reached can still shell out to something the new base
   lacks, so `--trace` with a representative workload matters more here than anywhere else.
 - **`--prune-unused` applies to a narrow case**: the final stage of a file that already builds
@@ -286,13 +308,13 @@ All notable changes to this project are documented here. The format follows
 - **It needs Linux 5.3 or later**, for `PTRACE_GET_SYSCALL_INFO`. An older kernel is detected
   and reported, pointing at `--tracer proc`.
 - **A trace still only covers what you exercised.** ptrace removes the sampling race, not the
-  need for a representative workload. dtrim still removes nothing on its own.
+  need for a representative workload. docker-trim still removes nothing on its own.
 
 ## [0.2.0] - 2026-09-25
 
 ### Added
 
-- **Runtime tracing** (`--tracer proc`, `--trace`, `--trace-timeout`). dtrim builds an
+- **Runtime tracing** (`--tracer proc`, `--trace`, `--trace-timeout`). docker-trim builds an
   ephemeral copy of the image with a sensor wrapping its entrypoint, runs it, and samples
   `/proc/*/exe`, `/proc/*/maps` and `/proc/*/fd` to record every binary that ran and every
   library that loaded. Those files are attributed back to the packages that installed them
@@ -305,7 +327,7 @@ All notable changes to this project are documented here. The format follows
   compiled inside the ephemeral build, so it is always the right architecture and no binary
   lives in the repository. See [docs/tracing.md](docs/tracing.md).
 
-  Removal stays manual. dtrim reports what to consider dropping; it does not delete packages
+  Removal stays manual. docker-trim reports what to consider dropping; it does not delete packages
   on the strength of one trace.
 
 - **`--fail-on <severity>`**, so a pipeline can reject a Dockerfile that bakes in a
@@ -322,7 +344,7 @@ All notable changes to this project are documented here. The format follows
   by name instead.
 
 - **Exit code `1` now means "findings met the `--fail-on` threshold".** Previously there
-  were only two codes; `2` still means dtrim itself could not run. Keeping them apart is
+  were only two codes; `2` still means docker-trim itself could not run. Keeping them apart is
   what lets a pipeline tell a bad Dockerfile from a broken tool. Nothing changes for a run
   without `--fail-on`.
 
@@ -330,9 +352,9 @@ All notable changes to this project are documented here. The format follows
 
 - **DT010 no longer flags a base image that already drops privileges.** An image whose tag
   says `nonroot`, as Google's distroless and Chainguard's images do, sets a non-root user in
-  the image itself, so a Dockerfile using one needs no `USER` line. dtrim was reporting that
+  the image itself, so a Dockerfile using one needs no `USER` line. docker-trim was reporting that
   as "container runs as root" at high severity, which meant flagging the exact arrangement it
-  recommends everywhere else, and meant dtrim's own Dockerfile failed its own `--fail-on
+  recommends everywhere else, and meant docker-trim's own Dockerfile failed its own `--fail-on
   high` gate. An explicit `USER root` is still reported, since that overrides whatever the
   base set.
 
@@ -342,12 +364,12 @@ All notable changes to this project are documented here. The format follows
   same 40ms command traced six times caught between three and ten dynamically loaded Python
   modules, and a shorter sampling interval does not help. What is reliable is anything mapped
   for the life of the process, which is the interpreter, everything it links against, and
-  every long-lived worker. dtrim reports how long the traced command ran and warns when that
+  every long-lived worker. docker-trim reports how long the traced command ran and warns when that
   was under a second, and it never removes a package on the strength of a trace.
 - **Only the `proc` backend exists.** `--tracer ptrace` and `--tracer ebpf` are accepted and
   rejected, naming the backend that works.
-- **CVE counts are still unavailable.** `--fail-on` gates on dtrim's own findings, not on
-  vulnerabilities, because dtrim has no vulnerability data to gate on yet.
+- **CVE counts are still unavailable.** `--fail-on` gates on docker-trim's own findings, not on
+  vulnerabilities, because docker-trim has no vulnerability data to gate on yet.
 
 ## [0.1.0] - 2026-09-22
 
@@ -388,7 +410,7 @@ First release.
   roughly 10 seconds for a 260 MB image and minutes for a multi-gigabyte one. The layer walk
   itself is around 30 ms per layer; the export is all of the rest. Reading from a registry
   instead of the local daemon skips the export and is faster.
-- **No CVE counts.** The report says `n/a` rather than printing a vulnerability number dtrim
+- **No CVE counts.** The report says `n/a` rather than printing a vulnerability number docker-trim
   did not measure. Attack-surface metrics are reported instead.
 - **No rpm support.** RHEL-family images are detected and reported as unsupported for package
   inventory; size and layer analysis are unaffected.
@@ -396,26 +418,26 @@ First release.
   CPython patch release than the `python:3.x-slim` images, and Python resolves dependencies
   against the exact interpreter that runs pip. A requirement guarded by
   `python_full_version < "3.11.3"` is skipped on the builder and then required at runtime,
-  which produces an image that builds, starts, and dies on import. dtrim keeps Python on the
+  which produces an image that builds, starts, and dies on import. docker-trim keeps Python on the
   interpreter it built against and takes its saving from the build toolchain instead.
 - **Rust on alpine is declined** unless the build already targets
   `x86_64-unknown-linux-musl`, rather than silently producing a glibc binary that cannot run.
 - **`--verify` starting an image is evidence, not proof.** A container that survives the
   fifteen-second window has not crashed; it has not been exercised. A service that needs a
-  database it cannot reach will exit, and dtrim says so without claiming the rewrite is at
+  database it cannot reach will exit, and docker-trim says so without claiming the rewrite is at
   fault.
 - **The Go toolchain requirement is 1.25, above the PRD's 1.22.** The buildkit Dockerfile
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.7.0...HEAD
-[0.7.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.7.0
-[0.6.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.6.1
-[0.6.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.6.0
-[0.5.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.1
-[0.5.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.0
-[0.4.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.4.0
-[0.3.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.1
-[0.3.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.3.0
-[0.2.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.2.0
-[0.1.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.1.0
+[Unreleased]: https://github.com/mkamranr/docker-trim/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.7.0
+[0.6.1]: https://github.com/mkamranr/docker-trim/releases/tag/v0.6.1
+[0.6.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.6.0
+[0.5.1]: https://github.com/mkamranr/docker-trim/releases/tag/v0.5.1
+[0.5.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.5.0
+[0.4.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.4.0
+[0.3.1]: https://github.com/mkamranr/docker-trim/releases/tag/v0.3.1
+[0.3.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.3.0
+[0.2.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.2.0
+[0.1.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.1.0
