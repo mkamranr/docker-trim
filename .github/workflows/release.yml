@@ -21,6 +21,30 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # Re-releasing v0.1.0 during a repository restore rebuilt it as
+      # project_name: dtrim and recreated the ghcr package that name had been
+      # retired from. This refuses to publish anything that does not build as
+      # docker-trim, and runs before the registry login so a bad ref fails
+      # having pushed nothing.
+      #
+      # It cannot protect a re-pushed pre-0.8.0 tag: a tag push runs the
+      # workflow stored at that tag, and those carry their own copy of this
+      # file without this step. What it does cover is the workflow_dispatch
+      # path, which runs this workflow while checking out the named tag --
+      # which is how those tags get re-released in practice -- and every tag
+      # cut from here on. Blocking the push path needs a tag ruleset, not a
+      # workflow step.
+      - name: Refuse to publish under a retired name
+        run: |
+          name=$(sed -n 's/^project_name:[[:space:]]*//p' .goreleaser.yaml | head -1)
+          if [ "$name" != "docker-trim" ]; then
+            echo "::error::this ref builds as '${name:-unset}', not docker-trim"
+            echo "Publishing it would create release assets and a ghcr package under a retired name."
+            exit 1
+          fi
+          echo "builds as $name"
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
