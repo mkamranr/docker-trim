@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Planned
+
+- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
+  kernel exposes BTF.
+- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
+  ecosystems OSV does not cover and for language dependencies rather than OS packages.
+- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
+  reporting that Debian and Alpine images already get.
+- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.7.0] - 2026-09-26
+
 ### Added
 
 - **dtrim reports what a rewrite removed, not just what the original had.** `remainingCVEs`
@@ -39,15 +51,14 @@ All notable changes to this project are documented here. The format follows
   so and claims no reduction, rather than printing a `-100%` that would be this tool's most
   quotable mistake.
 
-### Planned
+### Known limitations
 
-- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
-  kernel exposes BTF.
-- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
-  ecosystems OSV does not cover and for language dependencies rather than OS packages.
-- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
-  reporting that Debian and Alpine images already get.
-- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+- **The comparison is only as good as both inventories.** An ecosystem dtrim cannot read on
+  either side is silently absent from both counts, so a reduction can flatter a rewrite that
+  merely moved dependencies somewhere dtrim does not look.
+- **rpm images still report no packages**, so neither side of a comparison works for them.
+- **A reduction is not a guarantee.** It counts advisories, not exploitability: ten
+  unreachable ones removed and one reachable one kept still reads as an improvement.
 
 ## [0.6.1] - 2026-09-26
 
@@ -397,7 +408,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.7.0
 [0.6.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.6.1
 [0.6.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.6.0
 [0.5.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.1
