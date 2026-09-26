@@ -246,7 +246,7 @@ docker-trim --analyze-only --fail-on high        # also refuse a shell, or runni
                                                  + base map)                        │
                                                                                     ▼
   Image ───────► layer inspector ──► package inventory ──► attack surface ──►    report
-                 (pure Go, streams   (dpkg / apk)          (embedded ruleset)   (text/JSON/
+                 (pure Go, streams   (dpkg/apk/rpm)        (embedded ruleset)   (text/JSON/
                   every layer tar)         │                                     markdown)
                                            ▼                                        │
                  --tracer ──────► run it and watch ──────────► what went unused ─────┤

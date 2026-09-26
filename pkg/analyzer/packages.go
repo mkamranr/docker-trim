@@ -14,14 +14,21 @@ import (
 // packageDB captures the package databases as the layer tars stream past, so
 // the inventory costs one pass over the image rather than a second one.
 //
-// dpkg and apk are parsed directly. rpm stores its database in Berkeley DB or
-// sqlite, neither of which is worth carrying a dependency for in this release;
-// it is detected and reported as unsupported instead of guessed at. See the
-// CHANGELOG's known limitations.
+// dpkg, apk and rpm are all parsed directly, with no package-manager
+// dependency. rpm on RHEL 9 and later keeps its database in SQLite, which
+// sqlite.go reads; RHEL 8 and earlier use Berkeley DB, which is detected and
+// reported as unsupported rather than guessed at.
 type packageDB struct {
 	dpkgStatus []byte
 	apkDB      []byte
-	sawRPM     bool
+	// rpmDB is /var/lib/rpm/rpmdb.sqlite, the RHEL 9 era format.
+	rpmDB []byte
+	// rpmWALBytes is the size of that database's write-ahead log, which is
+	// empty in a committed image and is worth reporting when it is not.
+	rpmWALBytes int
+	// sawRPM records an rpm database in a format that cannot be read, which
+	// in practice means the Berkeley DB layout of RHEL 8 and earlier.
+	sawRPM bool
 	// dpkgFiles maps a package name to the file list dpkg recorded for it.
 	// Only collected when ownership is wanted, because a full Debian image has
 	// hundreds of these and they are useless without a trace to compare against.
@@ -116,6 +123,14 @@ func (d *packageDB) maybeCapture(p string, r io.Reader) {
 		}
 	case d.wantLanguage && d.captureLanguage(p, r):
 		// Handled: a PyPI or npm package was recorded.
+	case p == rpmDBPath:
+		d.rpmDB = readCapped(r)
+	case p == rpmDBPath+"-wal":
+		// A non-empty write-ahead log means the database file alone is not the
+		// whole story. In a built image it is invariably empty, because the
+		// layer was committed after rpm checkpointed. If it is not, the
+		// inventory may be stale, and that has to be said rather than hidden.
+		d.rpmWALBytes = len(readCapped(r))
 	case strings.HasPrefix(p, "/var/lib/rpm/"):
 		d.sawRPM = true
 	case d.wantFiles && strings.HasPrefix(p, dpkgInfoDir) && strings.HasSuffix(p, ".list"):
@@ -160,11 +175,33 @@ func (d *packageDB) parse() (manager string, pkgs []Package, notes []string) {
 		if d.wantFiles {
 			attachApkFiles(pkgs, d.apkDB)
 		}
+	case len(d.rpmDB) > 0:
+		manager = "rpm"
+		rpms, err := parseRPMDB(d.rpmDB, d.wantFiles)
+		switch {
+		case err != nil:
+			// Deliberately not falling back to an empty inventory: zero
+			// packages reads as a clean image, and an unreadable database is
+			// not a clean image.
+			notes = append(notes, fmt.Sprintf(
+				"This image uses rpm, but its database could not be read (%v), so no "+
+					"operating-system package inventory is available. Size, layer and "+
+					"language analysis are unaffected.", err))
+		default:
+			pkgs = rpms
+			if d.rpmWALBytes > 0 {
+				notes = append(notes, fmt.Sprintf(
+					"rpm's write-ahead log holds %d bytes rather than being empty, so this "+
+						"inventory may not include the most recent package changes.", d.rpmWALBytes))
+			}
+		}
 	case d.sawRPM:
 		manager = "rpm"
 		notes = append(notes,
-			"This image uses rpm, whose database docker-trim cannot read yet, so no operating-system "+
-				"package inventory is available. Size, layer and language analysis are unaffected.")
+			"This image uses rpm with a Berkeley DB database, which docker-trim cannot read. "+
+				"RHEL 9 and later, and the Rocky, Alma and Fedora releases built on it, use "+
+				"SQLite and are supported. No operating-system package inventory is available "+
+				"for this image; size, layer and language analysis are unaffected.")
 	default:
 		manager = "none"
 	}

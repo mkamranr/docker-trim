@@ -250,8 +250,27 @@ func TestOSVEcosystem(t *testing.T) {
 		{"alpine", "3.21", "Alpine:v3.21", false},
 		{"debian", "", "", true},
 		{"", "", "", true},
-		{"rhel", "9", "", true},
 		{"arch", "", "", true},
+
+		// The RHEL rebuilds are tracked by major version.
+		{"rocky", "9.3", "Rocky Linux:9", false},
+		{"rocky", "9", "Rocky Linux:9", false},
+		{"almalinux", "9.4", "AlmaLinux:9", false},
+		{"rocky", "", "", true},
+
+		// Red Hat itself is not, and the difference matters: OSV answers
+		// "Red Hat" but returns zero advisories for "Red Hat:9" rather than
+		// an error, so appending the version would report every UBI image as
+		// clean. The version is matched inside each advisory instead, which
+		// is why an empty one is still usable here.
+		{"rhel", "9.8", "Red Hat", false},
+		{"rhel", "", "Red Hat", false},
+
+		// OSV has no ecosystem for these, and inventing one would return
+		// nothing and read as a clean image.
+		{"fedora", "41", "", true},
+		{"amzn", "2023", "", true},
+		{"centos", "7", "", true},
 	}
 	for _, c := range cases {
 		got, err := OSVEcosystem(&analyzer.ImageReport{OSID: c.id, OSVersionID: c.version})

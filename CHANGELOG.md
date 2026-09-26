@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **rpm package inventory**, so RHEL 9, Rocky, Alma and UBI images get the package reporting
+  and vulnerability scanning that Debian and Alpine images already got. Before this, every one
+  of them reported no operating-system packages at all and could not be scanned:
+  `redhat/ubi9-minimal` now reports 109 packages and 135 advisories, `rockylinux:9-minimal`
+  118 packages and 73.
+
+  rpm keeps its database in SQLite on RHEL 9 and later. Rather than take a SQLite driver --
+  `modernc.org/sqlite` is pure Go and would work, but adds a measured 4.5 MB to a binary whose
+  entire purpose is making things smaller -- docker-trim reads the file directly, the same way
+  it already parses dpkg and apk. The reader covers table b-trees, overflow chains and the
+  record format, and nothing else; anything it does not understand is an error rather than a
+  guess. Validated against `rpm -qa`: all 109 packages of `redhat/ubi9-minimal` match exactly,
+  including epochs and installed sizes.
+
+  RHEL 8 and earlier use Berkeley DB, which is still unsupported and still says so. An
+  unreadable database reports as unreadable, never as an image with no packages in it, and
+  `cveKnown` stays false for it.
+
+- **`Red Hat`, `Rocky Linux` and `AlmaLinux` OSV ecosystems.** The rebuilds are looked up by
+  major version, so a Rocky 9.3 image queries `Rocky Linux:9`. Red Hat itself is queried
+  without a version, which is not an oversight: OSV answers `Red Hat` but returns zero
+  advisories for `Red Hat:9` rather than an error, so following the `Debian:12` pattern would
+  have reported every UBI image as clean. Fedora, Amazon Linux and CentOS have no OSV
+  ecosystem at all and are refused rather than guessed at.
+
 ### Changed
 
 - **Licensing is Apache-2.0 only**, where it was `MIT OR Apache-2.0`. The dual grant is a Rust
@@ -25,8 +52,8 @@ All notable changes to this project are documented here. The format follows
   kernel exposes BTF.
 - **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
   ecosystems OSV does not cover and for language dependencies rather than OS packages.
-- **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
-  reporting that Debian and Alpine images already get.
+- **Berkeley DB rpm databases**, as RHEL 8 and earlier use. RHEL 9 and later, which store the
+  database in SQLite, are read as of the entry below.
 - Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
 
 ## [0.8.1] - 2026-09-26

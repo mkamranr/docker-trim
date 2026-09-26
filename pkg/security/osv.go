@@ -123,9 +123,22 @@ func OSVEcosystem(rep *analyzer.ImageReport) (string, error) {
 			version = parts[0] + "." + parts[1]
 		}
 		return "Alpine:v" + version, nil
+	case "rocky":
+		return majorEcosystem("Rocky Linux", "Rocky Linux", version)
+	case "almalinux":
+		return majorEcosystem("AlmaLinux", "AlmaLinux", version)
+	case "rhel":
+		// Red Hat is the one distribution OSV tracks without a version
+		// suffix, and the asymmetry is not cosmetic: querying "Red Hat:9"
+		// returns zero advisories rather than an error, which would report
+		// every UBI image as clean. Verified against api.osv.dev -- openssl
+		// 3.0.7-6.el9 answers 121 advisories as "Red Hat" and 0 as
+		// "Red Hat:9". The version still matters, but it is matched from the
+		// package's own version range inside each advisory.
+		return "Red Hat", nil
 	}
 	return "", fmt.Errorf("docker-trim does not know how to look up %q packages in OSV; "+
-		"Debian, Ubuntu and Alpine are supported", id)
+		"Debian, Ubuntu, Alpine, RHEL, Rocky and Alma are supported", id)
 }
 
 // osvRequest is one package lookup.
@@ -145,6 +158,20 @@ type osvBatchResponse struct {
 			ID string `json:"id"`
 		} `json:"vulns"`
 	} `json:"results"`
+}
+
+// majorEcosystem builds an OSV ecosystem name from a distribution's major
+// version, which is how OSV tracks the RHEL rebuilds: a Rocky 9.3 image is
+// looked up as "Rocky Linux:9".
+func majorEcosystem(name, display, version string) (string, error) {
+	if version == "" {
+		return "", fmt.Errorf("the image is %s but does not say which release", display)
+	}
+	major := version
+	if i := strings.IndexByte(major, '.'); i > 0 {
+		major = major[:i]
+	}
+	return name + ":" + major, nil
 }
 
 // resolveEcosystem decides which OSV ecosystem a package belongs to.
