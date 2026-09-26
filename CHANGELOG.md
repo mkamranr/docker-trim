@@ -6,13 +6,6 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-### Fixed
-
-- **The Homebrew formula is written to `Formula/`.** goreleaser put it at the tap's root,
-  where modern Homebrew no longer looks, so `brew install mkamranr/tap/dtrim` reported no
-  such formula even though the release had published one. The 0.5.1 formula was moved into
-  place by hand; releases from here on write there directly.
-
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
@@ -22,6 +15,25 @@ All notable changes to this project are documented here. The format follows
 - **rpm package inventory**, so RHEL, Fedora and Amazon Linux images get the same package
   reporting that Debian and Alpine images already get.
 - Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.6.0] - 2026-09-26
+
+### Fixed
+
+- **The Homebrew formula is written to `Formula/`.** goreleaser put it at the tap's root,
+  where modern Homebrew no longer looks, so `brew install mkamranr/tap/dtrim` reported no
+  such formula even though the release had published one. The 0.5.1 formula was moved into
+  place by hand; releases from here on write there directly.
+
+### Known limitations
+
+- **A clean language report is still not a clean image.** Vendored source, statically linked
+  binaries and anything installed without leaving a manifest stay invisible. Go, Rust, Ruby
+  and Java dependencies are not read yet.
+- **npm dev dependencies cannot be told from runtime ones** in an installed tree. Nothing in
+  `package.json` records which is which once it is on disk, so both are reported.
+- **The inventory is capped** at 4000 packages or 32 MB of metadata. Beyond that it stops and
+  says so, and every count derived from it is a floor.
 
 ## [0.5.1] - 2026-09-25
 
@@ -289,7 +301,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.6.0
 [0.5.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.1
 [0.5.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.0
 [0.4.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.4.0
