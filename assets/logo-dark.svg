@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="dtrim">
+  <title>dtrim</title>
+  <desc>Container image layers with the excess trimmed away.</desc>
+
+  <!-- What the image keeps. -->
+  <g fill="#22D3EE">
+    <rect x="7" y="13" width="26" height="11" rx="4"/>
+    <rect x="7" y="26.5" width="26" height="11" rx="4"/>
+    <rect x="7" y="40" width="26" height="11" rx="4"/>
+  </g>
+
+  <!-- What dtrim takes out, left visible so the saving is the point. -->
+  <g fill="#22D3EE" opacity="0.25">
+    <rect x="37" y="13" width="20" height="11" rx="4"/>
+    <rect x="37" y="26.5" width="20" height="11" rx="4"/>
+    <rect x="37" y="40" width="20" height="11" rx="4"/>
+  </g>
+
+  <!-- The cut. -->
+  <path d="M35 8v48" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="5 4"/>
+</svg>

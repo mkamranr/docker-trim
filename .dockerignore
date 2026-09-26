@@ -2,3 +2,4 @@ dist
 .git
 .github
 tests/fixtures/generated
+assets
