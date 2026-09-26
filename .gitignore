@@ -1,5 +1,8 @@
 # Build output
 /docker-trim
+# The pre-0.8.0 binary name. Kept so a stale build from before the rename
+# cannot be committed again, which is how a 22MB binary reached the repo once.
+/dtrim
 /dist/
 /bin/
 
