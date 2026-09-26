@@ -93,6 +93,12 @@ $ docker trim --image myapp:latest --osv
 The Docker CLI treats any executable named `docker-<name>` in that directory as a
 subcommand, so `docker trim` and `docker-trim` are the same binary and take the same flags.
 
+Docker's own global flags work too. `--context` and `--host` are honoured, so
+`docker --context prod trim --image api:latest` inspects the daemon you named rather than the
+default one. The TLS flags are refused with an explanation instead of being approximated --
+connecting to a daemon other than the one you asked for would make every number in the report
+describe the wrong image.
+
 <details>
 <summary><b>Other ways to install</b></summary>
 

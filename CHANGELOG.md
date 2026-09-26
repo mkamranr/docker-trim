@@ -16,6 +16,36 @@ All notable changes to this project are documented here. The format follows
   reporting that Debian and Alpine images already get.
 - Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
 
+## [0.8.1] - 2026-09-26
+
+### Fixed
+
+- **`docker trim` failed whenever docker itself was given a global flag.** Docker forwards its
+  own global flags to a plugin verbatim and *ahead of* the plugin name, so
+  `docker --debug trim --version` arrived as `["--debug", "trim", "--version"]` and was
+  rejected with `unknown flag: --debug` (exit 2). `docker --context ... trim` and
+  `docker -H ... trim` failed the same way. Invoking the tool by its own name was unaffected.
+
+  Those flags are now interpreted rather than skipped, which matters more than the crash did.
+  `--context` and `--host` select a daemon, and docker sets no environment variable to pass
+  that choice on -- a plugin's environment carries neither `DOCKER_HOST` nor `DOCKER_CONTEXT`.
+  Skipping the prefix is the one-line fix, and it would have left
+  `docker --context prod trim --image api` reporting the *default* daemon's sizes and CVE
+  counts under the name of prod's image.
+
+  `--context` is resolved to its endpoint and exported as `DOCKER_HOST` rather than passed
+  through as `DOCKER_CONTEXT`, because only the docker CLI understands contexts: image
+  inspection goes through go-containerregistry, whose client is built from the environment and
+  has never heard of them. Setting `DOCKER_CONTEXT` alone would have sent the tracer and the
+  inspector to two different daemons within a single run.
+
+  `--config` is honoured as `DOCKER_CONFIG`. `--debug`, `-D` and `--log-level` are
+  presentational and are ignored. The TLS flags, and any context carrying TLS material, are
+  refused with an explanation rather than guessed at: docker names three certificate files
+  individually while the client library takes one directory with fixed member names, and the
+  two do not round-trip. A flag from some future docker release that this does not recognise
+  is named on stderr and skipped, never dropped in silence.
+
 ## [0.8.0] - 2026-09-26
 
 ### Changed
@@ -434,7 +464,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/docker-trim/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/mkamranr/docker-trim/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/mkamranr/docker-trim/releases/tag/v0.8.1
 [0.8.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.8.0
 [0.7.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.7.0
 [0.6.1]: https://github.com/mkamranr/docker-trim/releases/tag/v0.6.1

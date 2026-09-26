@@ -9,12 +9,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -50,7 +48,21 @@ func run() int {
 	// failure, and cobra would print it as one.
 	var gateFailed bool
 	cmd := newRootCommand(&gateFailed)
-	cmd.SetArgs(commandLine())
+	args, env, err := commandLine(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "docker-trim: %v\n", err)
+		return exitError
+	}
+	// Docker's global flags reach us as environment for everything downstream:
+	// the tracer shells out to docker, and image inspection builds its client
+	// from the environment. Both have to agree on which daemon they mean.
+	for k, v := range env {
+		if err := os.Setenv(k, v); err != nil {
+			fmt.Fprintf(os.Stderr, "docker-trim: %v\n", err)
+			return exitError
+		}
+	}
+	cmd.SetArgs(args)
 
 	if err := cmd.ExecuteContext(ctx); err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -161,60 +173,6 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	cmd.AddCommand(pluginMetadataCommand())
 	cmd.SetVersionTemplate("{{.Version}}\n")
 	return cmd
-}
-
-// commandLine is the arguments to parse, with Docker's plugin subcommand
-// removed when there is one.
-//
-// The Docker CLI invokes a plugin as `docker-trim trim --flags`, passing the
-// subcommand it matched as the first argument. Left in place it is parsed as a
-// positional argument, so `docker trim --analyze-only -f Dockerfile` went
-// looking for an image called "trim".
-//
-// The environment variable is what distinguishes a plugin invocation from
-// someone typing the name themselves; Docker sets it and nothing else does.
-func commandLine() []string {
-	args := os.Args[1:]
-	if os.Getenv("DOCKER_CLI_PLUGIN_ORIGINAL_CLI_COMMAND") == "" {
-		return args
-	}
-	// On Windows the plugin is docker-trim.exe, so the extension has to come
-	// off before the name can match what Docker passes.
-	base := filepath.Base(os.Args[0])
-	name := strings.TrimPrefix(strings.TrimSuffix(base, filepath.Ext(base)), "docker-")
-	if name != "" && len(args) > 0 && args[0] == name {
-		return args[1:]
-	}
-	return args
-}
-
-// pluginMetadataCommand makes docker-trim usable as `docker trim`.
-//
-// The Docker CLI treats any executable named docker-<name> in its plugin
-// directory as a subcommand, and asks it for this one hidden command to learn
-// what it is. Answering costs a few lines, and without it Docker reports a
-// binary carrying exactly this naming convention as an invalid plugin, which
-// is a confusing way to greet someone who put it where the name suggests.
-//
-// Install with:
-//
-//	mkdir -p ~/.docker/cli-plugins
-//	ln -s "$(command -v docker-trim)" ~/.docker/cli-plugins/docker-trim
-func pluginMetadataCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:    "docker-cli-plugin-metadata",
-		Hidden: true,
-		Args:   cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]string{
-				"SchemaVersion":    "0.1.0",
-				"Vendor":           "mkamranr",
-				"Version":          version.Version(),
-				"ShortDescription": "Shrink container images and cut their attack surface",
-				"URL":              "https://github.com/mkamranr/docker-trim",
-			})
-		},
-	}
 }
 
 // configure turns the parsed flags into a validated Config.

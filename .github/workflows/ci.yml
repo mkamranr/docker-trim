@@ -92,3 +92,43 @@ jobs:
         run: |
           go build -o docker-trim .
           ./docker-trim --analyze-only -f Dockerfile --fail-on high
+
+      - name: docker trim survives docker's global flags
+        # Docker forwards its own global flags to a plugin verbatim and ahead
+        # of the plugin name. Getting that wrong broke `docker --debug trim`
+        # outright, and the naive fix -- skipping the prefix -- would have made
+        # `docker --context prod trim` report the default daemon's numbers
+        # under the name of someone else's. Both halves are asserted here.
+        run: |
+          set -euo pipefail
+          go build -o docker-trim .
+          mkdir -p ~/.docker/cli-plugins
+          ln -sf "$PWD/docker-trim" ~/.docker/cli-plugins/docker-trim
+
+          for inv in "trim" "--debug trim" "-D trim" "--log-level warn trim" \
+                     "--context default trim" "-c default trim"; do
+            echo "docker $inv --version"
+            docker $inv --version > /dev/null
+          done
+
+          # TLS cannot be forwarded faithfully, so it must refuse rather than
+          # connect with credentials the user did not choose.
+          if docker --tlsverify trim --version > /dev/null 2>&1; then
+            echo "FAIL: --tlsverify should have been refused"; exit 1
+          fi
+
+          # And the one that matters: a context naming an unreachable daemon
+          # has to fail *against that daemon*. Succeeding would prove the
+          # context was silently discarded.
+          docker pull -q alpine:3.20 > /dev/null
+          docker tag alpine:3.20 routing-check:local
+          docker trim --analyze-only --image routing-check:local --quiet > /dev/null
+          docker context create broken --docker host=unix:///nonexistent/docker.sock > /dev/null
+
+          if out=$(docker --context broken trim --analyze-only --image routing-check:local --quiet 2>&1); then
+            echo "FAIL: --context was ignored; the broken context should not have succeeded"; exit 1
+          fi
+          case "$out" in
+            *unix:///nonexistent/docker.sock*) echo "ok: --context routed to the daemon it names" ;;
+            *) echo "FAIL: it failed, but not because it used the named daemon:"; echo "$out"; exit 1 ;;
+          esac
