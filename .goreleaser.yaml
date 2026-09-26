@@ -28,8 +28,8 @@ archives:
     files:
       - README.md
       - CHANGELOG.md
-      - LICENSE-MIT
-      - LICENSE-APACHE
+      - LICENSE
+      - NOTICE
 
 checksum:
   name_template: SHA256SUMS
@@ -64,7 +64,7 @@ brews:
     commit_msg_template: "docker-trim {{ .Version }}"
     homepage: https://github.com/mkamranr/docker-trim
     description: Shrink container images and cut their attack surface
-    license: "MIT OR Apache-2.0"
+    license: "Apache-2.0"
     test: |
       system "#{bin}/docker-trim", "--version"
 

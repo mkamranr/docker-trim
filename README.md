@@ -11,7 +11,7 @@
 
 [![CI](https://github.com/mkamranr/docker-trim/actions/workflows/ci.yml/badge.svg)](https://github.com/mkamranr/docker-trim/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/mkamranr/docker-trim)](https://github.com/mkamranr/docker-trim/releases)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](#license)
 [![Go](https://img.shields.io/badge/go-1.25%2B-00ADD8)](https://go.dev)
 [![Size](https://img.shields.io/badge/binary-~14MB-lightgrey)](https://github.com/mkamranr/docker-trim/releases)
 
@@ -273,5 +273,8 @@ template for exactly that. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE) at your option.
-Contributions are accepted under the same terms.
+Licensed under the [Apache License 2.0](LICENSE). Contributions are accepted under the same
+terms.
+
+Releases up to and including v0.8.1 were published under `MIT OR Apache-2.0`. That grant still
+stands for those versions and cannot be withdrawn; the change applies to later releases.

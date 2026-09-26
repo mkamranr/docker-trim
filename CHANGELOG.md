@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Licensing is Apache-2.0 only**, where it was `MIT OR Apache-2.0`. The dual grant is a Rust
+  convention that fits this project poorly: every significant dependency -- buildkit,
+  go-containerregistry, cobra -- is Apache-2.0, and of the two halves the patent grant is the
+  one worth keeping for a tool that parses and rewrites other people's builds. Dropping MIT
+  gives up GPLv2 compatibility, which matters only to a GPLv2-*only* project vendoring
+  `pkg/trim`; GPLv2-or-later is unaffected.
+
+  `LICENSE-APACHE` is now `LICENSE`, the copyright notice moves to a `NOTICE` file, and
+  `LICENSE-MIT` is gone. Releases up to and including 0.8.1 were published under
+  `MIT OR Apache-2.0`; that grant stands for those versions and cannot be withdrawn.
+
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
