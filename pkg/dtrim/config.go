@@ -51,6 +51,9 @@ type Config struct {
 	Tracer TracerBackend
 	// OSV enriches the report with real CVE data from api.osv.dev.
 	OSV bool
+	// Compare names a second image to measure against, so the report can say
+	// what a rewrite actually removed rather than only what the first one has.
+	Compare string
 	// TraceTimeout caps how long a traced container runs. A server never exits
 	// on its own, so tracing one always ends here.
 	TraceTimeout time.Duration
@@ -110,6 +113,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Trace != "" && c.Tracer == TracerNone {
 		return fmt.Errorf("--trace needs a tracing backend: add --tracer proc")
+	}
+	if c.Compare != "" && !c.OSV {
+		return fmt.Errorf("--compare measures the difference in vulnerabilities, so it needs --osv")
+	}
+	if c.Compare != "" && c.Image == "" {
+		return fmt.Errorf("--compare needs a first image to measure against: add --image")
 	}
 	if c.OSV && c.Image == "" {
 		return fmt.Errorf("--osv looks up the packages in a built image: add --image")

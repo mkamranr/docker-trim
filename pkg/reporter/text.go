@@ -307,7 +307,11 @@ func writeSummary(b *strings.Builder, p palette, rep *dtrim.Report) {
 		fmt.Fprintf(b, "Attack Surface      : %s\n", sec.Summary())
 	}
 	if v := rep.Vulnerabilities; v != nil {
-		fmt.Fprintf(b, "Vulnerabilities     : %s\n", vulnSummary(p, v))
+		if after := rep.VulnerabilitiesAfter; after != nil {
+			fmt.Fprintf(b, "Vulnerabilities     : %s\n", vulnDelta(p, rep, v, after))
+		} else {
+			fmt.Fprintf(b, "Vulnerabilities     : %s\n", vulnSummary(p, v))
+		}
 		writeEcosystems(b, p, v)
 	}
 	fmt.Fprintf(b, "%s\n", p.dim(rule))
@@ -446,6 +450,35 @@ func sortedRoots(roots map[string]int) []string {
 		return out[i] < out[j]
 	})
 	return out
+}
+
+// vulnDelta renders the before and after, following the same convention as the
+// size line: the improvement in green, a regression in amber, and a dimmed
+// parenthetical carrying the qualifier.
+//
+// An image whose packages could not be read reports that rather than a zero.
+// It is the number someone would quote, so it is the one that must not be
+// wrong.
+func vulnDelta(p palette, rep *dtrim.Report, before, after *security.VulnerabilityReport) string {
+	if !rep.Result.RemainingCVEsKnown {
+		return fmt.Sprintf("%d in %d packages  %s", before.Total, before.Queried,
+			p.dim("(the compared image has no readable inventory, so no reduction is claimed)"))
+	}
+
+	change := p.dim("unchanged")
+	if before.Total > 0 {
+		pct := (1 - float64(after.Total)/float64(before.Total)) * 100
+		switch {
+		case pct > 0:
+			change = p.good(fmt.Sprintf("-%.1f%%", pct))
+		case pct < 0:
+			change = p.warn(fmt.Sprintf("+%.1f%%", -pct))
+		}
+	} else if after.Total > 0 {
+		change = p.warn("introduced")
+	}
+	return fmt.Sprintf("%d -> %d  %s %s", before.Total, after.Total, change,
+		p.dim(fmt.Sprintf("(%d and %d packages checked)", before.Queried, after.Queried)))
 }
 
 func baseOf(rep *dtrim.Report, original bool) string {

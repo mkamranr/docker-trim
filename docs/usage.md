@@ -147,6 +147,32 @@ processes, so dtrim reports how long the command ran and says so when that was u
 second. `docs/heuristics.md` and [tracing.md](tracing.md) explain what it can and cannot see.
 Removal is left to you: dtrim reports what to consider dropping and deletes nothing.
 
+### `--compare`
+
+Measure a second image against the first, so the report shows what a rewrite removed rather
+than only what the original has. Needs `--osv`.
+
+```console
+$ dtrim --image myapp:v1 --osv --compare myapp:v2
+Vulnerabilities     : 188 -> 34  -81.9% (199 and 97 packages checked)
+```
+
+`--osv --verify` does the same automatically against the image it just built, so a single
+command reports both reductions:
+
+```console
+Size Reduction      : -77.7% (measured)
+Vulnerabilities     : 188 -> 34  -81.9% (199 and 97 packages checked)
+```
+
+Advisories in the compared image are **informational**. `--fail-on` keeps gating on the image
+named by `--image`: an advisory present in both would otherwise count twice, and one the
+rewrite removed would still fail the build, which punishes the improvement.
+
+An image whose packages dtrim cannot read reports the plain count and says why, rather than a
+reduction. A `scratch` image contains nothing enumerable, and that is not the same as
+containing nothing vulnerable.
+
 ### `--prune-unused`
 
 Drop packages a trace never saw used from the install commands that name them. Needs

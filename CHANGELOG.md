@@ -6,6 +6,39 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **dtrim reports what a rewrite removed, not just what the original had.** `remainingCVEs`
+  has been `0` since 0.1.0. `--osv --verify` now scans the image it just built, and
+  `--compare <tag>` measures any two existing tags. Measured on a real Python service:
+
+  ```
+  Size Reduction      : -77.7% (measured)
+  Vulnerabilities     : 188 -> 34  -81.9% (199 and 97 packages checked)
+  ```
+
+  Advisories from the compared image are informational. `--fail-on` still gates only on the
+  image named by `--image`: one present in both would count twice, and one the rewrite removed
+  would still fail the build, which punishes the improvement.
+
+### Fixed
+
+- **Distroless images reported zero packages.** They record what they contain as one stanza
+  file per package under `/var/lib/dpkg/status.d/`, and dtrim read only the single
+  `/var/lib/dpkg/status` database. `gcr.io/distroless/base-debian12` reported
+  `packageManager: none` and no packages; it ships seven, including `libc6` and `libssl3` —
+  the two that carry the advisories.
+
+  So the images dtrim spends its time recommending were the ones it could not inspect, and any
+  before-and-after against one would have read `72 -> 0` while measuring nothing. Those stanzas
+  carry no `Status:` field, unlike the status database, so they are treated as installed by
+  the presence of the file.
+
+- **An unreadable image is no longer reported as a clean one.** A `scratch` image contains
+  nothing enumerable, which is not the same as containing nothing vulnerable. The report says
+  so and claims no reduction, rather than printing a `-100%` that would be this tool's most
+  quotable mistake.
+
 ### Planned
 
 - **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose

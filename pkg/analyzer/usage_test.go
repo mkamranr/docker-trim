@@ -309,3 +309,90 @@ func TestAttributeUsage_name_collision_cannot_remove_an_os_package(t *testing.T)
 		t.Errorf("used = %q, want the OS click once", got)
 	}
 }
+
+// Distroless and other stripped images record what they contain as one stanza
+// file per package under /var/lib/dpkg/status.d, with no Status field at all.
+// A real libc6 stanza from gcr.io/distroless/base-debian12 is Package, Source,
+// Version, Architecture and little else.
+//
+// Requiring Status, as /var/lib/dpkg/status needs, dropped every package in
+// exactly the images dtrim tells people to move to: libc6 and libssl3, the two
+// that carry the advisories, were invisible.
+func TestParseDpkgStanzas_treats_status_d_entries_as_installed(t *testing.T) {
+	const statusD = `Package: libc6
+Source: glibc
+Version: 2.36-9+deb12u14
+Architecture: amd64
+Installed-Size: 13001
+Priority: optional
+
+Package: libssl3
+Source: openssl
+Version: 3.0.17-1~deb12u2
+Architecture: amd64
+Installed-Size: 6390
+Priority: optional
+
+`
+	// The status.d reading: presence of the file is the installation record.
+	got := parseDpkgStanzas([]byte(statusD), true)
+	if len(got) != 2 {
+		t.Fatalf("packages = %d, want 2: %+v", len(got), got)
+	}
+	if got[0].Name != "libc6" || got[0].Version != "2.36-9+deb12u14" {
+		t.Errorf("first = %+v", got[0])
+	}
+	if got[0].SizeBytes != 13001*1024 {
+		t.Errorf("size = %d, want the Installed-Size in bytes", got[0].SizeBytes)
+	}
+
+	// The status-file reading still requires proof, because that file lists
+	// packages which have been removed but left their configuration behind.
+	if strict := parseDpkgStanzas([]byte(statusD), false); len(strict) != 0 {
+		t.Errorf("packages = %d from stanzas with no Status field, want none", len(strict))
+	}
+}
+
+// The checksum files sitting beside the stanzas are not packages.
+func TestIsDpkgStatusD(t *testing.T) {
+	yes := []string{
+		"/var/lib/dpkg/status.d/libc6",
+		"/var/lib/dpkg/status.d/ca-certificates",
+		"/var/lib/dpkg/status.d/base-files",
+	}
+	no := []string{
+		"/var/lib/dpkg/status.d/libc6.md5sums",
+		"/var/lib/dpkg/status.d/",
+		"/var/lib/dpkg/status",
+		"/var/lib/dpkg/info/libc6.list",
+		"/etc/os-release",
+	}
+	for _, p := range yes {
+		if !isDpkgStatusD(p) {
+			t.Errorf("isDpkgStatusD(%q) = false, want true", p)
+		}
+	}
+	for _, p := range no {
+		if isDpkgStatusD(p) {
+			t.Errorf("isDpkgStatusD(%q) = true, want false", p)
+		}
+	}
+}
+
+// A full status database and a status.d directory must not both be read, or an
+// image carrying both would double count.
+func TestPackageDB_prefers_the_status_database_over_status_d(t *testing.T) {
+	d := newPackageDB(false)
+	d.maybeCapture("/var/lib/dpkg/status", strings.NewReader(
+		"Package: fromstatus\nStatus: install ok installed\nVersion: 1.0\n\n"))
+	d.maybeCapture("/var/lib/dpkg/status.d/fromstatusd", strings.NewReader(
+		"Package: fromstatusd\nVersion: 2.0\n"))
+
+	manager, pkgs, _ := d.parse()
+	if manager != "dpkg" {
+		t.Errorf("manager = %q", manager)
+	}
+	if len(pkgs) != 1 || pkgs[0].Name != "fromstatus" {
+		t.Errorf("packages = %+v, want only the status database's", pkgs)
+	}
+}

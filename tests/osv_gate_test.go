@@ -150,3 +150,99 @@ func TestOSV_keeps_dockerfile_findings_too(t *testing.T) {
 		t.Error("the advisories were lost")
 	}
 }
+
+// The headline number: what a rewrite actually removed.
+//
+// This is the claim most likely to be quoted, so it is also the one most worth
+// proving. The test builds a fat image, compares it against the minimal base
+// dtrim would move it to, and requires the reduction to be real and measured.
+func TestOSV_compare_measures_what_a_rewrite_removes(t *testing.T) {
+	requireDocker(t)
+
+	const fat = "debian:12-slim"
+	const lean = "gcr.io/distroless/static-debian12:nonroot"
+	for _, img := range []string{fat, lean} {
+		if out, err := exec.Command("docker", "pull", "-q", img).CombinedOutput(); err != nil {
+			t.Skipf("cannot pull %s: %v\n%s", img, err, out)
+		}
+	}
+
+	r := dtrim(t, "--image", fat, "--osv", "--compare", lean, "--quiet")
+	if r.code != 0 {
+		t.Fatalf("exit %d\n%s%s", r.code, r.stdout, r.stderr)
+	}
+	var rep struct {
+		Optimization struct {
+			OriginalCVEs       int  `json:"originalCVEs"`
+			RemainingCVEs      int  `json:"remainingCVEs"`
+			RemainingCVEsKnown bool `json:"remainingCvesKnown"`
+		} `json:"optimization"`
+		VulnerabilitiesAfter *struct {
+			Queried int `json:"queried"`
+		} `json:"vulnerabilitiesAfter"`
+	}
+	if err := json.Unmarshal([]byte(r.stdout), &rep); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v", err)
+	}
+
+	// The distroless base records its packages one stanza per file under
+	// status.d. Before dtrim read that format it reported zero packages, which
+	// would have made this comparison a lie rather than a measurement.
+	if !rep.Optimization.RemainingCVEsKnown {
+		t.Fatal("the minimal image's inventory was unreadable, so no comparison was possible")
+	}
+	if rep.VulnerabilitiesAfter == nil || rep.VulnerabilitiesAfter.Queried == 0 {
+		t.Fatal("no packages were checked in the compared image")
+	}
+	if rep.Optimization.RemainingCVEs > rep.Optimization.OriginalCVEs {
+		t.Errorf("the minimal image reports more advisories (%d) than the fat one (%d)",
+			rep.Optimization.RemainingCVEs, rep.Optimization.OriginalCVEs)
+	}
+	t.Logf("%s -> %s: %d advisories -> %d, across %d packages",
+		fat, lean, rep.Optimization.OriginalCVEs, rep.Optimization.RemainingCVEs,
+		rep.VulnerabilitiesAfter.Queried)
+}
+
+// An image with nothing to enumerate must never read as a clean one.
+func TestOSV_compare_refuses_to_claim_a_reduction_against_scratch(t *testing.T) {
+	requireDocker(t)
+
+	const fat = "debian:12-slim"
+	if out, err := exec.Command("docker", "pull", "-q", fat).CombinedOutput(); err != nil {
+		t.Skipf("cannot pull %s: %v\n%s", fat, err, out)
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "hello"), []byte("#!/bin/true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"),
+		[]byte("FROM scratch\nCOPY hello /hello\nCMD [\"/hello\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const tag = "dtrim-compare-it:scratch"
+	if out, err := exec.Command("docker", "build", "-q", "-t", tag, dir).CombinedOutput(); err != nil {
+		t.Fatalf("building the scratch fixture: %v\n%s", err, out)
+	}
+	t.Cleanup(func() { _ = exec.Command("docker", "image", "rm", "-f", tag).Run() })
+
+	r := dtrim(t, "--image", fat, "--osv", "--compare", tag, "--quiet")
+	if r.code != 0 {
+		t.Fatalf("comparing against an unreadable image should not fail: exit %d\n%s", r.code, r.stderr)
+	}
+	var rep struct {
+		Optimization struct {
+			RemainingCVEsKnown bool `json:"remainingCvesKnown"`
+		} `json:"optimization"`
+		Notes []string `json:"notes"`
+	}
+	if err := json.Unmarshal([]byte(r.stdout), &rep); err != nil {
+		t.Fatal(err)
+	}
+	if rep.Optimization.RemainingCVEsKnown {
+		t.Error("claimed a measured remaining count for an image with no inventory")
+	}
+	if !strings.Contains(strings.Join(rep.Notes, " "), "not the same as having none") {
+		t.Errorf("the limitation was not disclosed: %v", rep.Notes)
+	}
+}

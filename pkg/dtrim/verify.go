@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mkamranr/dtrim/pkg/analyzer"
 	"github.com/mkamranr/dtrim/pkg/tracer"
 )
 
@@ -83,6 +84,20 @@ func verify(ctx context.Context, cfg Config, rep *Report) error {
 
 	_, _ = fmt.Fprintf(status, "[dtrim] Starting the trimmed image to check it still runs...\n")
 	smoke := tracer.Smoke(ctx, trimTag, smokeWindow)
+
+	// While the image still exists: the cleanup defer registered above removes
+	// it the moment this function returns, so there is nowhere later to do it.
+	if cfg.OSV && rep.Vulnerabilities != nil {
+		_, _ = fmt.Fprintf(status, "[dtrim] Checking what the rewrite removed...\n")
+		after, err := analyzer.InspectImage(ctx, trimTag)
+		if err != nil {
+			rep.Notes = append(rep.Notes,
+				"The trimmed image could not be inspected, so no vulnerability reduction is "+
+					"claimed: "+err.Error())
+		} else if err := compareVulnerabilities(ctx, cfg, rep, after, "The trimmed image"); err != nil {
+			return err
+		}
+	}
 
 	rep.Result.OriginalSizeBytes = originalSize
 	rep.Result.TrimmedSizeBytes = trimmedSize

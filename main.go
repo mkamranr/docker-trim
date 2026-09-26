@@ -76,6 +76,7 @@ type flags struct {
 	aggressiveness string
 	tracer         string
 	osv            bool
+	compare        string
 	buildContext   string
 	failOn         string
 	pruneUnused    bool
@@ -108,6 +109,7 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 			"  dtrim --analyze-only myapp:latest --quiet | jq .image.categories",
 			"  dtrim --analyze-only --fail-on high   # exits 1 if the image ships a shell",
 			"  dtrim --image myapp:latest --tracer proc --trace \"pytest -q\"",
+			"  dtrim --image myapp:v1 --osv --compare myapp:v2   # what the rewrite removed",
 		}, "\n"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := configure(cmd, &f, args)
@@ -143,6 +145,7 @@ func newRootCommand(gateFailed *bool) *cobra.Command {
 	fl.StringVar(&f.aggressiveness, "aggressiveness", "likely", "How much to change: safe, likely, aggressive")
 	fl.StringVar(&f.tracer, "tracer", "none", "Runtime tracing backend: none, proc (no privileges), ptrace (exact; ebpf is planned)")
 	fl.DurationVar(&f.traceTimeout, "trace-timeout", 30*time.Second, "How long to let a traced container run")
+	fl.StringVar(&f.compare, "compare", "", "A second image to measure against, so the report shows what was removed; needs --osv")
 	fl.BoolVar(&f.osv, "osv", false, "Look up known vulnerabilities at api.osv.dev; sends package names and versions")
 	fl.StringVar(&f.buildContext, "context", "", "Build context directory (default: the Dockerfile's directory)")
 	fl.BoolVar(&f.pruneUnused, "prune-unused", false, "Drop packages a runtime trace never saw used; needs --tracer")
@@ -205,6 +208,7 @@ func configure(cmd *cobra.Command, f *flags, args []string) (dtrim.Config, error
 	cfg.Verify = f.verify
 	cfg.Aggressiveness = dtrim.Confidence(f.aggressiveness)
 	cfg.OSV = f.osv
+	cfg.Compare = f.compare
 	cfg.Context = f.buildContext
 	cfg.TraceTimeout = f.traceTimeout
 	cfg.PruneUnused = f.pruneUnused

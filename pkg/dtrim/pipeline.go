@@ -33,7 +33,10 @@ type Report struct {
 	Security *security.Assessment `json:"security,omitempty"`
 	// Vulnerabilities is present only when --osv actually queried OSV.
 	Vulnerabilities *security.VulnerabilityReport `json:"vulnerabilities,omitempty"`
-	Result          OptimizationResult            `json:"optimization"`
+	// VulnerabilitiesAfter is the same for the image being compared against,
+	// whether that is one --verify built or one named by --compare.
+	VulnerabilitiesAfter *security.VulnerabilityReport `json:"vulnerabilitiesAfter,omitempty"`
+	Result               OptimizationResult            `json:"optimization"`
 	// Verification is present only when --verify actually built both images,
 	// which is the only way a size in this report is a measurement.
 	Verification *Verification `json:"verification,omitempty"`
@@ -147,6 +150,24 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 				return nil, err
 			}
 		}
+
+		// Scanned here, before the rewrite, because --verify compares the image
+		// it builds against this result and does that inside the rewrite. Only
+		// the counts are recorded; the findings are folded in afterwards.
+		if cfg.OSV {
+			if err := runOSV(ctx, cfg, rep); err != nil {
+				return nil, err
+			}
+			if cfg.Compare != "" {
+				after, err := analyzer.InspectImage(ctx, cfg.Compare)
+				if err != nil {
+					return nil, err
+				}
+				if err := compareVulnerabilities(ctx, cfg, rep, after, cfg.Compare); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	// After the image and any trace, so the rewrite can use what they found.
@@ -158,19 +179,11 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 
 	// Last, and it has to stay last.
 	//
-	// runOSV appends advisories to rep.Findings and annotates rep.Security, and
-	// runDockerfile assigns to both. Running the scan first therefore produced
-	// a report where every vulnerability had been silently dropped before
-	// --fail-on could see it: an image with eighteen high-severity advisories
-	// printed "PASS nothing at high or above" and exited 0.
-	//
-	// Nothing in runDockerfile reads the scan, so ordering it here costs
-	// nothing and removes the hazard rather than working around it.
-	if cfg.OSV {
-		if err := runOSV(ctx, cfg, rep); err != nil {
-			return nil, err
-		}
-	}
+	// The Dockerfile pass assigns to both rep.Findings and rep.Security, so
+	// folding the scan in any earlier loses it. That is how --fail-on came to
+	// pass images carrying critical advisories: they were found, counted, and
+	// overwritten before the gate could see them.
+	foldVulnerabilities(rep)
 
 	rep.Result.Duration = time.Since(start)
 	rep.Result.DurationMS = rep.Result.Duration.Milliseconds()

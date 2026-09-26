@@ -30,6 +30,8 @@ type packageDB struct {
 	wantFiles bool
 	// release is /etc/os-release, which names the distribution and version.
 	release []byte
+	// dpkgStatusD accumulates the per-package stanzas from status.d.
+	dpkgStatusD []byte
 
 	// Language packages, which unlike the OS databases arrive as one small
 	// file per package rather than a handful of large ones.
@@ -52,7 +54,10 @@ const (
 	dpkgStatusPath = "/var/lib/dpkg/status"
 	apkDBPath      = "/lib/apk/db/installed"
 	dpkgInfoDir    = "/var/lib/dpkg/info/"
-	osReleasePath  = "/etc/os-release"
+	// dpkgStatusDir is how distroless and other stripped images record what
+	// they contain: one stanza file per package instead of a single database.
+	dpkgStatusDir = "/var/lib/dpkg/status.d/"
+	osReleasePath = "/etc/os-release"
 	// Debian and Alpine both ship the real file here and symlink /etc to it,
 	// and a tar stream carries the symlink rather than following it.
 	usrLibOSReleasePath = "/usr/lib/os-release"
@@ -91,6 +96,17 @@ func (d *packageDB) maybeCapture(p string, r io.Reader) {
 	switch {
 	case p == dpkgStatusPath:
 		d.dpkgStatus = readCapped(r)
+	case isDpkgStatusD(p):
+		// Distroless images keep one stanza per file here rather than a single
+		// status database. Concatenating them with a blank line between yields
+		// exactly the format the status parser already reads.
+		if body := readCapped(r); len(body) > 0 {
+			d.dpkgStatusD = append(d.dpkgStatusD, body...)
+			if !bytes.HasSuffix(body, []byte("\n")) {
+				d.dpkgStatusD = append(d.dpkgStatusD, '\n')
+			}
+			d.dpkgStatusD = append(d.dpkgStatusD, '\n')
+		}
 	case p == apkDBPath:
 		d.apkDB = readCapped(r)
 	case p == osReleasePath || p == usrLibOSReleasePath:
@@ -127,6 +143,14 @@ func (d *packageDB) parse() (manager string, pkgs []Package, notes []string) {
 	case len(d.dpkgStatus) > 0:
 		manager = "dpkg"
 		pkgs = parseDpkgStatus(d.dpkgStatus)
+		if d.wantFiles {
+			attachDpkgFiles(pkgs, d.dpkgFiles)
+		}
+	case len(d.dpkgStatusD) > 0:
+		// A stripped image: the stanzas are all there is, and the presence of
+		// the file is itself the record that the package is installed.
+		manager = "dpkg"
+		pkgs = parseDpkgStanzas(d.dpkgStatusD, true)
 		if d.wantFiles {
 			attachDpkgFiles(pkgs, d.dpkgFiles)
 		}
@@ -181,19 +205,40 @@ func (d *packageDB) osRelease() (id, name, versionID string) {
 	return id, name, versionID
 }
 
+// isDpkgStatusD matches a per-package stanza file, excluding the checksum
+// files that sit beside them.
+func isDpkgStatusD(p string) bool {
+	return strings.HasPrefix(p, dpkgStatusDir) &&
+		!strings.HasSuffix(p, ".md5sums") &&
+		strings.TrimPrefix(p, dpkgStatusDir) != ""
+}
+
 // parseDpkgStatus reads /var/lib/dpkg/status: RFC822-style stanzas separated by
 // a blank line, one per package.
 func parseDpkgStatus(b []byte) []Package {
+	return parseDpkgStanzas(b, false)
+}
+
+// parseDpkgStanzas reads dpkg stanzas.
+//
+// assumeInstalled exists because the two places these come from disagree about
+// what proves a package is present. /var/lib/dpkg/status lists packages that
+// have been removed but whose configuration remains, so a Status field ending
+// in "installed" is what separates them. A status.d file carries no Status
+// field at all — libc6 in a distroless image has Package, Source, Version and
+// little else — so requiring one drops every package in exactly the images
+// dtrim recommends people move to.
+func parseDpkgStanzas(b []byte, assumeInstalled bool) []Package {
 	var (
 		out  []Package
 		cur  Package
-		kept bool
+		kept = assumeInstalled
 	)
 	flush := func() {
 		if kept && cur.Name != "" {
 			out = append(out, cur)
 		}
-		cur, kept = Package{}, false
+		cur, kept = Package{}, assumeInstalled
 	}
 
 	sc := bufio.NewScanner(bytes.NewReader(b))

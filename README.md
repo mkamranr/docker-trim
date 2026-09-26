@@ -194,6 +194,7 @@ dtrim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
 | `--verify` | | `false` | Build both images, measure them, and start the trimmed one |
 | `--analyze-only` | | `false` | Report only; never writes anything |
 | `--fail-on` | | | Exit 1 when a finding of this severity or worse survives |
+| `--compare` | | | A second image to measure against; needs `--osv` |
 | `--prune-unused` | | `false` | Drop packages a trace never saw used; needs `--tracer` |
 | `--aggressiveness` | | `likely` | How much to change: `safe`, `likely`, `aggressive` |
 | `--quiet` | `-q` | `false` | Emit the JSON report on stdout and nothing else |

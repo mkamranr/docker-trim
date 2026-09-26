@@ -80,6 +80,11 @@ type OptimizationResult struct {
 	// CVEsKnown is false when no vulnerability source was available, in which
 	// case the CVE fields are meaningless and the reporter prints "n/a".
 	CVEsKnown bool `json:"cvesKnown"`
+	// RemainingCVEsKnown is false when the image being compared against had no
+	// package inventory to read. An unreadable image is not a clean one, and
+	// reporting its zero as a reduction would be the most quotable thing this
+	// tool could get wrong.
+	RemainingCVEsKnown bool `json:"remainingCvesKnown"`
 	// DurationMS mirrors Duration for JSON consumers.
 	DurationMS int64 `json:"durationMs"`
 }
