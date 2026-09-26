@@ -79,15 +79,24 @@ Attack Surface      : Removed 4 unused OS packages, 2 shells, 2 package managers
 curl -fsSL https://raw.githubusercontent.com/mkamranr/docker-trim/main/install.sh | sh
 ```
 
+Then, if you want it as a Docker subcommand:
+
+```sh
+mkdir -p ~/.docker/cli-plugins
+ln -sf "$(command -v docker-trim)" ~/.docker/cli-plugins/docker-trim
+```
+
+```console
+$ docker trim --image myapp:latest --osv
+```
+
+The Docker CLI treats any executable named `docker-<name>` in that directory as a
+subcommand, so `docker trim` and `docker-trim` are the same binary and take the same flags.
+
 <details>
 <summary><b>Other ways to install</b></summary>
 
 ```sh
-# As a Docker CLI plugin, so it becomes `docker trim`
-mkdir -p ~/.docker/cli-plugins
-ln -sf "$(command -v docker-trim)" ~/.docker/cli-plugins/docker-trim
-docker trim --analyze-only -f Dockerfile
-
 # Homebrew
 brew install mkamranr/tap/docker-trim
 
@@ -101,11 +110,8 @@ docker run --rm -v "$PWD:/work" -w /work ghcr.io/mkamranr/docker-trim:latest --a
 git clone https://github.com/mkamranr/docker-trim && cd docker-trim && make build
 ```
 
-The install script honours `DOCKER_TRIM_VERSION` to pin a release and `DOCKER_TRIM_BIN_DIR` to choose
-where the binary lands.
-
-Linked into `~/.docker/cli-plugins` the binary answers to `docker trim`, because the Docker
-CLI treats any executable named `docker-<name>` there as a subcommand.
+The install script honours `DOCKER_TRIM_VERSION` to pin a release, and
+`DOCKER_TRIM_BIN_DIR` to choose where the binary lands.
 
 </details>
 
@@ -144,8 +150,8 @@ get a builder stage invented for it.
 ### How often does the rewrite apply?
 
 Against 66 real Dockerfiles — 24 from projects like Grafana, Airflow, Immich and the official
-images, the rest from one developer's machine — docker-trim restructured **23%** of them. The other
-three quarters it declined, and the reasons matter more than the number:
+images, the rest from one developer's machine — docker-trim restructured **23%** of them.
+The other three quarters it declined, and the reasons matter more than the number:
 
 | | |
 | --: | :--- |
@@ -190,6 +196,7 @@ CPython build is how you get an image that starts and then dies on import.
 
 ```
 docker-trim [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]
+docker trim  [OPTIONS] [DOCKERFILE_PATH or IMAGE_NAME]   # same binary, as a Docker plugin
 ```
 
 | Flag | Short | Default | Description |
