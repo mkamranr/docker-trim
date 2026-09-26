@@ -16,6 +16,28 @@ All notable changes to this project are documented here. The format follows
   reporting that Debian and Alpine images already get.
 - Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
 
+## [0.6.1] - 2026-09-26
+
+### Fixed
+
+- **`--fail-on` silently passed images carrying critical vulnerabilities.** Advisories were
+  found, counted and reported in the JSON, then dropped from the findings before the gate
+  could see them. An image with eighteen high-severity advisories printed
+  `PASS nothing at high or above` and exited 0.
+
+  `runOSV` appended advisories to the findings; `runDockerfile` then assigned over them, and
+  clobbered the security assessment the same way, restoring the "CVE counts are not reported"
+  note that had just been removed. Because `--osv` requires `--image` and `--verify` requires
+  `--file`, **every combined invocation was affected** — which is every use of `--osv` in a
+  pipeline that also lints its Dockerfile.
+
+  The scan now runs last. Nothing in the Dockerfile path reads it, so ordering it there
+  removes the hazard rather than working around it.
+
+  The regression test derives what to expect from the scan itself rather than naming
+  advisories, so it cannot go stale as the database changes, and it was confirmed to fail
+  against the old ordering before being committed.
+
 ## [0.6.0] - 2026-09-26
 
 ### Added
@@ -342,7 +364,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/mkamranr/dtrim/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.6.1
 [0.6.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.6.0
 [0.5.1]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.1
 [0.5.0]: https://github.com/mkamranr/dtrim/releases/tag/v0.5.0

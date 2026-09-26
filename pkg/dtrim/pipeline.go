@@ -147,16 +147,27 @@ func Run(ctx context.Context, cfg Config) (*Report, error) {
 				return nil, err
 			}
 		}
-		if cfg.OSV {
-			if err := runOSV(ctx, cfg, rep); err != nil {
-				return nil, err
-			}
-		}
 	}
 
 	// After the image and any trace, so the rewrite can use what they found.
 	if cfg.File != "" {
 		if err := runDockerfile(ctx, cfg, rep); err != nil {
+			return nil, err
+		}
+	}
+
+	// Last, and it has to stay last.
+	//
+	// runOSV appends advisories to rep.Findings and annotates rep.Security, and
+	// runDockerfile assigns to both. Running the scan first therefore produced
+	// a report where every vulnerability had been silently dropped before
+	// --fail-on could see it: an image with eighteen high-severity advisories
+	// printed "PASS nothing at high or above" and exited 0.
+	//
+	// Nothing in runDockerfile reads the scan, so ordering it here costs
+	// nothing and removes the hazard rather than working around it.
+	if cfg.OSV {
+		if err := runOSV(ctx, cfg, rep); err != nil {
 			return nil, err
 		}
 	}
