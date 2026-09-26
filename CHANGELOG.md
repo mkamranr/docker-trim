@@ -18,6 +18,47 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.6.0] - 2026-09-26
 
+### Added
+
+- **`--osv` covers application dependencies, not just operating-system packages.** It shipped
+  in 0.5.0 scanning the half of an image where advisories tend to be low severity and
+  unreachable, and staying silent about the half where exploitable ones concentrate. Measured
+  on two real images:
+
+  | | before | after |
+  | :-- | --: | --: |
+  | a Python service | 18 advisories | **72** (54 PyPI + 18 Debian) |
+  | a Node service | none, across 18 packages | **63** across 238 npm packages |
+
+  Three quarters of the Python image's advisories were previously invisible, and the Node one
+  reported nothing at all — a `--fail-on` gate would have passed it. `--fail-on` now covers
+  all of it.
+
+  The inventory reads what the image contains rather than a manifest from the build context,
+  because the two differ: a lockfile says what was meant to be installed, and site-packages
+  says what is there.
+
+- **Packages record which ecosystem and install root they came from.** A `node:22-alpine` base
+  ships 185 npm packages inside npm itself, so an application that installed three would
+  otherwise be told it has 238 — true, and useless. The report separates them.
+
+### Changed
+
+- **The OSV lookup runs in two phases.** One `querybatch` request covers up to a thousand
+  packages and says which have any advisory; only those are then asked about individually,
+  which is the only way to get a CVSS vector. A 256-package image takes a few dozen requests
+  rather than 256.
+
+- **`schemaVersion` is now 2.** `vulnerabilities.ecosystem`, a single string, became
+  `vulnerabilities.ecosystems`, a list, because an image holds packages from several at once.
+  Everything else is additive.
+
+- **Language packages are never classified as removable.** They are inventoried and scanned,
+  but never appear in the "never touched" list and never reach `--prune-unused`: dtrim edits
+  Dockerfiles and those arrive through a lockfile. It also closes a hazard, since a PyPI
+  package sharing a name with an OS one could otherwise have got that OS package stripped
+  from an `apt-get install` line.
+
 ### Fixed
 
 - **The Homebrew formula is written to `Formula/`.** goreleaser put it at the tap's root,
