@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Planned
+
+- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
+  kernel exposes BTF.
+- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
+  ecosystems OSV does not cover and for language dependencies rather than OS packages.
+- **Berkeley DB rpm databases**, as RHEL 8 and earlier use. RHEL 9 and later, which store the
+  database in SQLite, are read as of the entry below.
+- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
+
+## [0.9.0] - 2026-09-27
+
 ### Added
 
 - **rpm package inventory**, so RHEL 9, Rocky, Alma and UBI images get the package reporting
@@ -45,16 +57,6 @@ All notable changes to this project are documented here. The format follows
   `LICENSE-APACHE` is now `LICENSE`, the copyright notice moves to a `NOTICE` file, and
   `LICENSE-MIT` is gone. Releases up to and including 0.8.1 were published under
   `MIT OR Apache-2.0`; that grant stands for those versions and cannot be withdrawn.
-
-### Planned
-
-- **The eBPF backend**, for the same fidelity as `ptrace` at lower overhead, on hosts whose
-  kernel exposes BTF.
-- **`trivy` and `grype` adapters**, used automatically when either is on `PATH`, for
-  ecosystems OSV does not cover and for language dependencies rather than OS packages.
-- **Berkeley DB rpm databases**, as RHEL 8 and earlier use. RHEL 9 and later, which store the
-  database in SQLite, are read as of the entry below.
-- Merging consecutive `RUN` instructions (DT012 currently reports them without fixing them).
 
 ## [0.8.1] - 2026-09-26
 
@@ -504,7 +506,8 @@ First release.
   parser needs 1.23, and `golang.org/x/sys` (pulled in transitively by the container
   registry client) needs 1.25.
 
-[Unreleased]: https://github.com/mkamranr/docker-trim/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/mkamranr/docker-trim/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.9.0
 [0.8.1]: https://github.com/mkamranr/docker-trim/releases/tag/v0.8.1
 [0.8.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.8.0
 [0.7.0]: https://github.com/mkamranr/docker-trim/releases/tag/v0.7.0
